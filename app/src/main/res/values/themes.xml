@@ -1,0 +1,4 @@
+<resources>
+    <!-- Base launch theme; actual theming happens inside Compose via AuraTheme. -->
+    <style name="Theme.Aura" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

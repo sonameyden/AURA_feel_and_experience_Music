@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel target="17">
+      <module name="AURA.app" target="25" />
+      <module name="AURA.core.audio" target="25" />
+      <module name="AURA.core.common" target="25" />
+      <module name="AURA.core.data" target="25" />
+      <module name="AURA.core.designsystem" target="25" />
+      <module name="AURA.feature.artist" target="25" />
+      <module name="AURA.feature.home" target="25" />
+      <module name="AURA.feature.library" target="25" />
+      <module name="AURA.feature.moodinput" target="25" />
+      <module name="AURA.feature.nowplaying" target="25" />
+      <module name="AURA.feature.playlist" target="25" />
+      <module name="AURA.feature.search" target="25" />
+      <module name="AURA.feature.settings" target="25" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
