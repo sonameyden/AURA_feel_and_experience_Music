@@ -1,6 +1,6 @@
 # AURA — Android Project (Phase 1 Skeleton)
 
-Generated from `AURA_Project_Specification.md`. This is the **Phase 1** skeleton
+This is the **Phase 1** skeleton
 described in that document's Section 12: Gradle module structure, the "Aura"
 theme, the central `AtmosphereProfile` data model, Room + Retrofit + Hilt wiring,
 and every screen's navigation shell — all compiling against **placeholder**
