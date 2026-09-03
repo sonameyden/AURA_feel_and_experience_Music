@@ -2,13 +2,9 @@ package com.aura.feature.nowplaying
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -84,7 +80,7 @@ fun NowPlayingScreen(
                 KaleidoscopeLayer(
                     style = profile.kaleidoscopeStyle,
                     energy = (profile.energy + state.liveAudioEnergy) / 2f,
-                    beatPulse = false, // TODO Phase 3: wire AudioAnalyzer.beatPulse
+                    beatPulse = state.beatPulse,
                     tintHex = profile.secondaryColorHexes.firstOrNull() ?: profile.primaryColorHex,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -92,9 +88,7 @@ fun NowPlayingScreen(
                 CatCompanion(
                     behaviorState = profile.catBehavior,
                     liveAudioEnergy = state.liveAudioEnergy,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 )
 
                 val currentLine = state.lyrics?.lines?.firstOrNull { line ->
@@ -106,51 +100,20 @@ fun NowPlayingScreen(
                     isResonant = currentLine?.id in profile.resonantLyricLineIds,
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
-
-                IconButton(
-                    onClick = onBackClick,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .statusBarsPadding()
-                        .padding(top = 16.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
-                    )
-                }
-
-                // Play/Pause Button
-                IconButton(
-                    onClick = viewModel::onPlayPauseClick,
-                    modifier = Modifier.align(Alignment.Center)
-                ) {
-                    val isPlaying = state.playbackState is PlaybackState.Playing
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier.fillMaxSize(0.2f)
-                    )
-                }
-
-                if (state.playbackState is PlaybackState.Buffering) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Loading audio...",
-                            color = Color.White,
-                            modifier = Modifier.padding(top = 64.dp)
-                        )
-                    }
-                }
             }
+        }
+
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White
+            )
         }
     }
 }

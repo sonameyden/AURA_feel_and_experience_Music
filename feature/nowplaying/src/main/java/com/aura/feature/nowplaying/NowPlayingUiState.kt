@@ -15,7 +15,8 @@ sealed interface NowPlayingUiState {
         val playbackState: PlaybackState,
         val atmosphereProfile: AtmosphereProfile,
         val lyrics: LyricsResponse?,
-        val liveAudioEnergy: Float // smoothed 0f..1f value from AudioAnalyzer, updated continuously
+        val liveAudioEnergy: Float, // smoothed 0f..1f value from AudioAnalyzer, updated continuously
+        val beatPulse: Boolean      // true briefly on a detected onset/beat — drives KaleidoscopeLayer's pulse
     ) : NowPlayingUiState
 
     data class Error(val message: String) : NowPlayingUiState

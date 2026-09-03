@@ -67,13 +67,15 @@ class NowPlayingViewModel @Inject constructor(
 
             combine(
                 player.playbackState,
-                audioAnalyzer.currentAmplitude
-            ) { playback: PlaybackState, energy: Float ->
+                audioAnalyzer.currentAmplitude,
+                audioAnalyzer.beatPulse
+            ) { playback: PlaybackState, energy: Float, beat: Boolean ->
                 NowPlayingUiState.Ready(
                     playbackState = playback,
                     atmosphereProfile = atmosphere,
                     lyrics = lyrics,
-                    liveAudioEnergy = energy
+                    liveAudioEnergy = energy,
+                    beatPulse = beat
                 )
             }.collect { newState ->
                 _uiState.update { newState }

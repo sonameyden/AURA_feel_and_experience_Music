@@ -1,83 +1,122 @@
 package com.aura.core.audio
 
 import android.media.audiofx.Visualizer
-import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.hypot
+import kotlin.math.abs
+import kotlin.math.max
 
 /**
  * Reads live amplitude/beat data from whatever AuraPlayer is currently playing,
- * using Android's android.media.audiofx.Visualizer API attached to the
- * ExoPlayer's audio session (see AuraPlayer.audioSessionId()).
+ * using Android's built-in android.media.audiofx.Visualizer, attached to the
+ * ExoPlayer's own audio session id (see AuraPlayer.audioSessionId()).
  *
  * This is what ParticleLayer, KaleidoscopeLayer, and the Rive cat/environment
- * state-machine `energy` inputs all read from — it is the single source of
- * "how energetic does this moment sound right now."
+ * state-machine `energy` inputs all read from.
+ *
+ * No special runtime permission is needed here — Visualizer only requires
+ * RECORD_AUDIO when capturing a DIFFERENT app's audio session; capturing your
+ * own app's own ExoPlayer session (which is what this does) does not.
  */
 @Singleton
 class AudioAnalyzer @Inject constructor() {
 
+    private var visualizer: Visualizer? = null
+
     private val _currentAmplitude = MutableStateFlow(0f) // 0f..1f, smoothed
     val currentAmplitude: StateFlow<Float> = _currentAmplitude.asStateFlow()
 
-    private val _beatPulse = MutableStateFlow(false) // toggles true briefly on detected beat/onset
+    private val _beatPulse = MutableStateFlow(false) // toggles true briefly on a detected onset
     val beatPulse: StateFlow<Boolean> = _beatPulse.asStateFlow()
 
-    private var visualizer: Visualizer? = null
+    // Smoothing state for amplitude (simple exponential moving average).
+    private var smoothedAmplitude = 0f
+    private val smoothingFactor = 0.25f // higher = more responsive, lower = smoother
+
+    // Simple energy-based onset/beat detector: compare current energy against
+    // a rolling average; a spike above the average by some margin = a beat.
+    private var rollingEnergyAverage = 0f
+    private val rollingAverageFactor = 0.9f
+    private val beatThresholdMultiplier = 1.35f
 
     fun attach(audioSessionId: Int) {
-        if (audioSessionId == 0) return
-        
-        try {
-            visualizer = Visualizer(audioSessionId).apply {
-                captureSize = Visualizer.getCaptureSizeRange()[1]
-                setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
-                        if (waveform == null) return
-                        
-                        // Simple amplitude calculation: RMS
-                        var sum = 0f
-                        for (i in waveform.indices) {
-                            val sample = (waveform[i].toInt() and 0xFF) - 128
-                            sum += sample * sample
-                        }
-                        val rms = Math.sqrt((sum / waveform.size).toDouble()).toFloat()
-                        // Normalize: 0..1 (RMS usually peaks around 64-80 for loud music)
-                        val normalized = (rms / 64f).coerceIn(0f, 1f)
-                        _currentAmplitude.value = normalized
-                    }
+        if (audioSessionId == 0) return // 0 means no session yet (e.g. player not prepared)
+        detach() // clean up any previous instance first
 
-                    override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
-                        if (fft == null) return
-                        
-                        // Detect "beat" based on low-frequency energy (bins 2-10)
-                        var lowFreqEnergy = 0f
-                        for (i in 2..10 step 2) {
-                            val real = fft[i].toFloat()
-                            val imag = fft[i + 1].toFloat()
-                            lowFreqEnergy += hypot(real, imag)
+        runCatching {
+            visualizer = Visualizer(audioSessionId).apply {
+                captureSize = Visualizer.getCaptureSizeRange()[1] // max capture size for smoother readings
+                setDataCaptureListener(
+                    object : Visualizer.OnDataCaptureListener {
+                        override fun onWaveFormDataCapture(
+                            visualizer: Visualizer?,
+                            waveform: ByteArray?,
+                            samplingRate: Int
+                        ) {
+                            waveform ?: return
+                            processWaveform(waveform)
                         }
-                        
-                        // Simple threshold-based pulse
-                        _beatPulse.value = lowFreqEnergy > 150f
-                    }
-                }, Visualizer.getMaxCaptureRate() / 2, true, true)
+
+                        override fun onFftDataCapture(
+                            visualizer: Visualizer?,
+                            fft: ByteArray?,
+                            samplingRate: Int
+                        ) {
+                            // Not used in this version — waveform amplitude is enough
+                            // for particle/kaleidoscope/cat energy. Add FFT-band
+                            // analysis here later if you want frequency-specific
+                            // reactivity (e.g. bass-only pulses).
+                        }
+                    },
+                    Visualizer.getMaxCaptureRate() / 2, // sample at half max rate — plenty smooth, less CPU
+                    /* waveform = */ true,
+                    /* fft = */ false
+                )
                 enabled = true
             }
-        } catch (e: Exception) {
-            Log.e("AudioAnalyzer", "Failed to initialize Visualizer", e)
+        }.onFailure {
+            // Visualizer can fail to attach in some emulator configurations or if
+            // the session id is momentarily invalid right after a song change —
+            // fail silently and just keep emitting the last known amplitude
+            // rather than crashing the Now Playing screen over a visual extra.
+            visualizer = null
         }
     }
 
+    private fun processWaveform(waveform: ByteArray) {
+        // PCM 8-bit unsigned waveform data, centered at 128. Compute average
+        // absolute deviation from center as a simple loudness proxy.
+        var sum = 0
+        for (byte in waveform) {
+            sum += abs(byte.toInt() - 128)
+        }
+        val rawAmplitude = (sum.toFloat() / waveform.size) / 128f // normalize to roughly 0..1
+        val clamped = rawAmplitude.coerceIn(0f, 1f)
+
+        smoothedAmplitude += (clamped - smoothedAmplitude) * smoothingFactor
+        _currentAmplitude.value = smoothedAmplitude
+
+        // Beat detection: spike relative to the rolling average = a pulse.
+        rollingEnergyAverage = max(
+            0.01f, // avoid divide-by-zero-ish stalls during silence
+            rollingEnergyAverage * rollingAverageFactor + clamped * (1 - rollingAverageFactor)
+        )
+        val isBeat = clamped > rollingEnergyAverage * beatThresholdMultiplier
+        _beatPulse.value = isBeat
+    }
+
     fun detach() {
-        visualizer?.apply {
-            enabled = false
-            release()
+        runCatching {
+            visualizer?.enabled = false
+            visualizer?.release()
         }
         visualizer = null
+        smoothedAmplitude = 0f
+        rollingEnergyAverage = 0f
+        _currentAmplitude.value = 0f
+        _beatPulse.value = false
     }
 }
