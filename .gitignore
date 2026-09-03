@@ -24,3 +24,7 @@ secrets.properties
 
 # Built variants
 **/build/
+
+# Project Specs and Secrets
+AURA_Project_Specification.md
+**/google-services.json
