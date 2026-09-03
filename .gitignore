@@ -1,18 +1,26 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+/.idea/
 .DS_Store
-build/
-captures/
+/build
+/*/build
+/captures
 .externalNativeBuild
 .cxx
 local.properties
-
-# Never commit real backend URLs/keys if you template them into local.properties
 secrets.properties
+.artifacts/
+*.log
+
+# Android Studio / IntelliJ
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+
+# Built variants
+**/build/

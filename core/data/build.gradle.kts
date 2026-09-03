@@ -17,6 +17,7 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:common"))
+    implementation(project(":core:auth"))
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

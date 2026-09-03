@@ -3,6 +3,8 @@ package com.aura.core.data.di
 import android.content.Context
 import androidx.room.Room
 import com.aura.core.data.local.AuraDatabase
+import com.aura.core.data.local.dao.ArtistDao
+import com.aura.core.data.local.dao.CatalogCacheDao
 import com.aura.core.data.local.dao.PlaylistDao
 import com.aura.core.data.local.dao.SongDao
 import dagger.Module
@@ -28,4 +30,10 @@ object DatabaseModule {
 
     @Provides
     fun providePlaylistDao(database: AuraDatabase): PlaylistDao = database.playlistDao()
+
+    @Provides
+    fun provideCatalogCacheDao(database: AuraDatabase): CatalogCacheDao = database.catalogCacheDao()
+
+    @Provides
+    fun provideArtistDao(database: AuraDatabase): ArtistDao = database.artistDao()
 }

@@ -5,6 +5,10 @@ package com.aura.app.navigation
  * Feature modules never hardcode route strings themselves — they reference these.
  */
 sealed class Destination(val route: String) {
+    data object AuthGate : Destination("auth_gate")
+    data object Login : Destination("login")
+    data object SignUp : Destination("sign_up")
+
     data object Home : Destination("home")
     data object Search : Destination("search")
     data object MoodInput : Destination("mood_input")

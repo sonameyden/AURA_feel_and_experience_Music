@@ -5,9 +5,6 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-}
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
@@ -25,6 +22,7 @@ include(":core:model")
 include(":core:data")
 include(":core:audio")
 include(":core:common")
+include(":core:auth")
 include(":feature:home")
 include(":feature:search")
 include(":feature:moodinput")
@@ -33,3 +31,4 @@ include(":feature:library")
 include(":feature:playlist")
 include(":feature:artist")
 include(":feature:settings")
+include(":feature:auth")

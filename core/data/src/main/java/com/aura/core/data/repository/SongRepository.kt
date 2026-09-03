@@ -3,7 +3,9 @@ package com.aura.core.data.repository
 import com.aura.core.common.util.AppDispatchers
 import com.aura.core.common.util.AppError
 import com.aura.core.common.util.AppResult
+import com.aura.core.data.local.dao.CatalogCacheDao
 import com.aura.core.data.local.dao.SongDao
+import com.aura.core.data.local.entity.CatalogCacheEntity
 import com.aura.core.data.local.entity.SongEntity
 import com.aura.core.data.remote.CatalogApi
 import com.aura.core.model.Song
@@ -26,6 +28,7 @@ import javax.inject.Singleton
 class SongRepository @Inject constructor(
     private val catalogApi: CatalogApi,
     private val songDao: SongDao,
+    private val catalogCacheDao: CatalogCacheDao,
     private val dispatchers: AppDispatchers
 ) {
     fun observeCachedSongs(): Flow<List<Song>> =
@@ -57,17 +60,44 @@ class SongRepository @Inject constructor(
     }
 
     suspend fun getTrending(): AppResult<List<Song>> = withContext(dispatchers.io) {
-        runCatching { catalogApi.getTrending() }.fold(
+        runCatching {
+            // 1. Try to return cache immediately
+            val cached = catalogCacheDao.getBySection("trending")
+
+            // 2. Refresh from network
+            val remote = catalogApi.getTrending()
+            songDao.upsertAll(remote.map { SongEntity.fromDomain(it) })
+            catalogCacheDao.upsert(CatalogCacheEntity("trending", remote.map { it.id }))
+
+            remote
+        }.fold(
             onSuccess = { AppResult.Success(it) },
-            onFailure = { AppResult.Error(it.toAppError()) }
+            onFailure = {
+                // If network fails, try to fallback to cache if we haven't already returned it
+                val fallback = catalogCacheDao.getBySection("trending")?.songIds
+                    ?.mapNotNull { songDao.getById(it)?.toDomain() }
+                if (!fallback.isNullOrEmpty()) AppResult.Success(fallback)
+                else AppResult.Error(it.toAppError())
+            }
         )
     }
 
     suspend fun getRecommendations(basedOnSongId: String? = null): AppResult<List<Song>> =
         withContext(dispatchers.io) {
-            runCatching { catalogApi.getRecommendations(basedOnSongId) }.fold(
+            val sectionKey = if (basedOnSongId == null) "recommended_for_you" else "similar_to_$basedOnSongId"
+            runCatching {
+                val remote = catalogApi.getRecommendations(basedOnSongId)
+                songDao.upsertAll(remote.map { SongEntity.fromDomain(it) })
+                catalogCacheDao.upsert(CatalogCacheEntity(sectionKey, remote.map { it.id }))
+                remote
+            }.fold(
                 onSuccess = { AppResult.Success(it) },
-                onFailure = { AppResult.Error(it.toAppError()) }
+                onFailure = {
+                    val fallback = catalogCacheDao.getBySection(sectionKey)?.songIds
+                        ?.mapNotNull { songDao.getById(it)?.toDomain() }
+                    if (!fallback.isNullOrEmpty()) AppResult.Success(fallback)
+                    else AppResult.Error(it.toAppError())
+                }
             )
         }
 }

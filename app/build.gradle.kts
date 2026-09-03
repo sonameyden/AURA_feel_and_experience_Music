@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.plugin)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -51,6 +52,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:audio"))
     implementation(project(":core:common"))
+    implementation(project(":core:auth"))
     implementation(project(":feature:home"))
     implementation(project(":feature:search"))
     implementation(project(":feature:moodinput"))
@@ -59,6 +61,7 @@ dependencies {
     implementation(project(":feature:playlist"))
     implementation(project(":feature:artist"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:auth"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
