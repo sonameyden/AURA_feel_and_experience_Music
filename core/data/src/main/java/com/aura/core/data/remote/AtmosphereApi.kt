@@ -1,6 +1,7 @@
 package com.aura.core.data.remote
 
 import com.aura.core.model.AtmosphereProfile
+import com.aura.core.model.Song
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.GET
@@ -28,6 +29,9 @@ data class MoodRequest(
 )
 
 data class MoodResponse(
-    val songId: String,
-    val atmosphereProfile: AtmosphereProfile
+    val mode: String, // "recommendations" or "direct_play"
+    val reply: String,
+    val songs: List<Song> = emptyList(),
+    val song: Song? = null,
+    val atmosphereProfile: AtmosphereProfile? = null
 )

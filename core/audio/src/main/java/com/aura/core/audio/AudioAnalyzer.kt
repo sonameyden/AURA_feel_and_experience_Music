@@ -1,6 +1,7 @@
 package com.aura.core.audio
 
 import android.media.audiofx.Visualizer
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,13 +35,11 @@ class AudioAnalyzer @Inject constructor() {
 
     // Smoothing state for amplitude (simple exponential moving average).
     private var smoothedAmplitude = 0f
-    private val smoothingFactor = 0.25f // higher = more responsive, lower = smoother
+    private val smoothingFactor = 0.45f // More responsive
 
-    // Simple energy-based onset/beat detector: compare current energy against
-    // a rolling average; a spike above the average by some margin = a beat.
     private var rollingEnergyAverage = 0f
-    private val rollingAverageFactor = 0.9f
-    private val beatThresholdMultiplier = 1.35f
+    private val rollingAverageFactor = 0.8f // Faster adaptation
+    private val beatThresholdMultiplier = 1.12f // Even more sensitive
 
     fun attach(audioSessionId: Int) {
         if (audioSessionId == 0) return // 0 means no session yet (e.g. player not prepared)
@@ -91,9 +90,10 @@ class AudioAnalyzer @Inject constructor() {
         // absolute deviation from center as a simple loudness proxy.
         var sum = 0
         for (byte in waveform) {
-            sum += abs(byte.toInt() - 128)
+            // Correctly handle signed-to-unsigned conversion for PCM 8-bit data
+            sum += abs((byte.toInt() and 0xFF) - 128)
         }
-        val rawAmplitude = (sum.toFloat() / waveform.size) / 128f // normalize to roughly 0..1
+        val rawAmplitude = (sum.toFloat() / waveform.size) / 128f // normalize to 0..1
         val clamped = rawAmplitude.coerceIn(0f, 1f)
 
         smoothedAmplitude += (clamped - smoothedAmplitude) * smoothingFactor
@@ -101,11 +101,17 @@ class AudioAnalyzer @Inject constructor() {
 
         // Beat detection: spike relative to the rolling average = a pulse.
         rollingEnergyAverage = max(
-            0.01f, // avoid divide-by-zero-ish stalls during silence
+            0.01f,
             rollingEnergyAverage * rollingAverageFactor + clamped * (1 - rollingAverageFactor)
         )
         val isBeat = clamped > rollingEnergyAverage * beatThresholdMultiplier
-        _beatPulse.value = isBeat
+        
+        if (isBeat && !_beatPulse.value) {
+            Log.d("AURA_RES", "BEAT PULSE! Amp: $clamped")
+            _beatPulse.value = true
+        } else if (!isBeat) {
+            _beatPulse.value = false
+        }
     }
 
     fun detach() {

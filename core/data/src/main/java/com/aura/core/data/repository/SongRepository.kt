@@ -12,6 +12,11 @@ import com.aura.core.model.Song
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -98,6 +103,25 @@ class SongRepository @Inject constructor(
                     if (!fallback.isNullOrEmpty()) AppResult.Success(fallback)
                     else AppResult.Error(it.toAppError())
                 }
+            )
+        }
+
+    suspend fun uploadSong(title: String, genre: String, file: File): AppResult<Song> =
+        withContext(dispatchers.io) {
+            runCatching {
+                val titlePart = title.toRequestBody("text/plain".toMediaType())
+                val genrePart = genre.toRequestBody("text/plain".toMediaType())
+                val filePart = MultipartBody.Part.createFormData(
+                    "audioFile",
+                    file.name,
+                    file.asRequestBody("audio/*".toMediaType())
+                )
+                val remote = catalogApi.uploadSong(titlePart, genrePart, filePart)
+                songDao.upsert(SongEntity.fromDomain(remote))
+                remote
+            }.fold(
+                onSuccess = { AppResult.Success(it) },
+                onFailure = { AppResult.Error(it.toAppError()) }
             )
         }
 }

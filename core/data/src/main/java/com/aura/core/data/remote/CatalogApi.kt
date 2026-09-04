@@ -5,8 +5,13 @@ import com.aura.core.model.Artist
 import com.aura.core.model.Playlist
 import com.aura.core.model.Song
 import retrofit2.http.GET
+import retrofit2.http.Multipart
+import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 
 /**
  * Talks to YOUR backend's catalog endpoints (Section 10 of the project spec) —
@@ -33,4 +38,12 @@ interface CatalogApi {
 
     @GET("catalog/recommendations")
     suspend fun getRecommendations(@Query("basedOn") songId: String? = null): List<Song>
+
+    @Multipart
+    @POST("catalog/songs/upload")
+    suspend fun uploadSong(
+        @Part("title") title: RequestBody,
+        @Part("genre") genre: RequestBody,
+        @Part audioFile: MultipartBody.Part
+    ): Song
 }

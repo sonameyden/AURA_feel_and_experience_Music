@@ -2,8 +2,10 @@ package com.aura.feature.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aura.core.audio.AuraPlayer
 import com.aura.core.common.util.AppResult
 import com.aura.core.data.repository.SongRepository
+import com.aura.core.model.Song
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val songRepository: SongRepository
+    private val songRepository: SongRepository,
+    private val player: AuraPlayer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
@@ -32,5 +35,16 @@ class SearchViewModel @Inject constructor(
                 AppResult.Loading -> Unit
             }
         }
+    }
+
+    /**
+     * Starts playback immediately on the first tap, using the current result
+     * list as the queue, so Next/Previous on Now Playing walk through the
+     * same results the user searched.
+     */
+    fun onSongClick(song: Song) {
+        val results = (_uiState.value as? SearchUiState.Results)?.songs?.takeIf { it.isNotEmpty() } ?: listOf(song)
+        val startIndex = results.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+        player.playQueue(results, startIndex)
     }
 }

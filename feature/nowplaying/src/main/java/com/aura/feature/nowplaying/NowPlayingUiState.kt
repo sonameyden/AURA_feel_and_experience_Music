@@ -13,10 +13,13 @@ sealed interface NowPlayingUiState {
 
     data class Ready(
         val playbackState: PlaybackState,
+        val currentPositionMs: Long,   // smoothed, continuously-updated — drives the seek bar
         val atmosphereProfile: AtmosphereProfile,
         val lyrics: LyricsResponse?,
-        val liveAudioEnergy: Float, // smoothed 0f..1f value from AudioAnalyzer, updated continuously
-        val beatPulse: Boolean      // true briefly on a detected onset/beat — drives KaleidoscopeLayer's pulse
+        val liveAudioEnergy: Float,    // smoothed 0f..1f value from AudioAnalyzer, updated continuously
+        val beatPulse: Boolean,        // true briefly on a detected onset/beat — drives KaleidoscopeLayer's pulse
+        val hasNext: Boolean,
+        val hasPrevious: Boolean
     ) : NowPlayingUiState
 
     data class Error(val message: String) : NowPlayingUiState

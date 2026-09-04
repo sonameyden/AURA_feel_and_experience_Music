@@ -1,6 +1,7 @@
 package com.aura.core.designsystem.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -17,20 +18,26 @@ import androidx.compose.ui.unit.dp
  *
  * @param accentColor optional tint (e.g. an environment's primary color) blended
  *   at low alpha into the card background — used for mood tiles / current song card.
+ * @param onClick optional — when provided, the card becomes tappable and the
+ *   ripple is clipped to the card's rounded shape (applying `.clickable`
+ *   from outside the card does NOT clip correctly, so this is the supported way).
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     accentColor: Color? = null,
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val base = MaterialTheme.colorScheme.surface
     val background = accentColor?.let { base.copy(alpha = 0.92f).compositeOver(it, alpha = 0.12f) } ?: base
+    val shape = RoundedCornerShape(20.dp)
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(shape)
             .background(background)
+            .let { m -> if (onClick != null) m.clickable(onClick = onClick) else m }
     ) {
         content()
     }

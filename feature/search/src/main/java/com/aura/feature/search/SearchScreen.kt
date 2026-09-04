@@ -69,7 +69,10 @@ fun SearchScreen(
                             supportingContent = { Text(song.artistName) },
                             modifier = Modifier
                                 .padding(vertical = 2.dp)
-                                .clickable { onSongClick(song.id) }
+                                .clickable {
+                                    viewModel.onSongClick(song)
+                                    onSongClick(song.id)
+                                }
                         )
                     }
                 }

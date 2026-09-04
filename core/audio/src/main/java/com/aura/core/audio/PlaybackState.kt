@@ -9,8 +9,8 @@ import com.aura.core.model.Song
  */
 sealed interface PlaybackState {
     data object Idle : PlaybackState
-    data object Buffering : PlaybackState
-    data class Playing(val song: Song, val positionMs: Long) : PlaybackState
-    data class Paused(val song: Song, val positionMs: Long) : PlaybackState
+    data class Buffering(val song: Song) : PlaybackState
+    data class Playing(val song: Song, val positionMs: Long, val durationMs: Long = 0L) : PlaybackState
+    data class Paused(val song: Song, val positionMs: Long, val durationMs: Long = 0L) : PlaybackState
     data class Error(val message: String) : PlaybackState
 }

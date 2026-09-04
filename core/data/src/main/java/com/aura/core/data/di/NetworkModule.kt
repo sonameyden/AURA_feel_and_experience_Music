@@ -1,6 +1,5 @@
 package com.aura.core.data.di
 
-import android.util.Log
 import com.aura.core.auth.AuthRepository
 import com.aura.core.data.remote.AtmosphereApi
 import com.aura.core.data.remote.CatalogApi
@@ -27,6 +26,7 @@ import javax.inject.Singleton
  * Replace with your real deployed backend URL before building a release.
  */
 private const val BASE_URL = "https://aura-backend.sonameydenaura.workers.dev/"
+private const val AURA_BACKEND_KEY = "aura-dev-secret-2025" 
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -51,13 +51,13 @@ object NetworkModule {
     @Singleton
     fun provideAuthInterceptor(authRepository: AuthRepository): Interceptor = Interceptor { chain ->
         val token = runBlocking { authRepository.getIdToken() }
-        Log.d("AURA_TOKEN", "Bearer $token")
-        val request = if (token != null) {
-            chain.request().newBuilder().addHeader("Authorization", "Bearer $token").build()
-        } else {
-            chain.request()
+        val requestBuilder = chain.request().newBuilder()
+        if (token != null) {
+            requestBuilder.addHeader("Authorization", "Bearer $token")
         }
-        chain.proceed(request)
+        // Aligning header name with the Cloudflare Worker's expected secret key
+        requestBuilder.addHeader("X-Aura-Dev-Secret", AURA_BACKEND_KEY)
+        chain.proceed(requestBuilder.build())
     }
 
     @Provides
