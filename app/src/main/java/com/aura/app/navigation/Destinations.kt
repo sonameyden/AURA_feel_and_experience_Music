@@ -19,6 +19,9 @@ sealed class Destination(val route: String) {
     }
 
     data object Library : Destination("library")
+    data object LikedSongs : Destination("liked_songs")
+    data object History : Destination("history")
+    data object Playlists : Destination("playlists")
 
     data object PlaylistDetail : Destination("playlist/{playlistId}") {
         const val ARG_PLAYLIST_ID = "playlistId"

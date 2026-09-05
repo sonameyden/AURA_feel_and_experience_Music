@@ -1,15 +1,12 @@
 package com.aura.feature.nowplaying.visuals
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -30,8 +27,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,11 +53,14 @@ fun PlayerControls(
     durationMs: Long,
     hasNext: Boolean,
     hasPrevious: Boolean,
+    isLiked: Boolean,
     accentHex: String,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onSeek: (Long) -> Unit,
+    onLikeClick: () -> Unit,
+    onArtistClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = runCatching { Color(android.graphics.Color.parseColor(accentHex)) }
@@ -67,12 +69,8 @@ fun PlayerControls(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f))
-                )
-            )
-            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .padding(horizontal = 24.dp)
+            .padding(top = 12.dp, bottom = 8.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -80,14 +78,20 @@ fun PlayerControls(
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = artistName,
                 color = Color.White.copy(alpha = 0.75f),
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(top = 2.dp, bottom = 16.dp)
+                    .clickable(onClick = onArtistClick)
             )
 
             var isDragging by remember { mutableStateOf(false) }
@@ -161,6 +165,17 @@ fun PlayerControls(
                     accent = accent,
                     onClick = onNextClick
                 )
+                
+                Spacer(modifier = Modifier.width(20.dp))
+
+                IconButton(onClick = onLikeClick) {
+                    Icon(
+                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isLiked) "Unlike" else "Like",
+                        tint = if (isLiked) Color(0xFFE91E63) else Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
     }

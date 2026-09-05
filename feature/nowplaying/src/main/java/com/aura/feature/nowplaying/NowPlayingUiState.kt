@@ -19,7 +19,8 @@ sealed interface NowPlayingUiState {
         val liveAudioEnergy: Float,    // smoothed 0f..1f value from AudioAnalyzer, updated continuously
         val beatPulse: Boolean,        // true briefly on a detected onset/beat — drives KaleidoscopeLayer's pulse
         val hasNext: Boolean,
-        val hasPrevious: Boolean
+        val hasPrevious: Boolean,
+        val isLiked: Boolean = false
     ) : NowPlayingUiState
 
     data class Error(val message: String) : NowPlayingUiState

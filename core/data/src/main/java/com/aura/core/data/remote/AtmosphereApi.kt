@@ -2,6 +2,8 @@ package com.aura.core.data.remote
 
 import com.aura.core.model.AtmosphereProfile
 import com.aura.core.model.Song
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.GET
@@ -23,15 +25,17 @@ interface AtmosphereApi {
     suspend fun getAtmosphereForMood(@Body request: MoodRequest): MoodResponse
 }
 
+@JsonClass(generateAdapter = true)
 data class MoodRequest(
-    val moodText: String,
-    val recentlyPlayedSongIds: List<String> = emptyList()
+    @Json(name = "moodText") val moodText: String,
+    @Json(name = "recentlyPlayedSongIds") val recentlyPlayedSongIds: List<String> = emptyList()
 )
 
+@JsonClass(generateAdapter = true)
 data class MoodResponse(
-    val mode: String, // "recommendations" or "direct_play"
-    val reply: String,
-    val songs: List<Song> = emptyList(),
-    val song: Song? = null,
-    val atmosphereProfile: AtmosphereProfile? = null
+    @Json(name = "mode") val mode: String, // "recommendations" or "direct_play"
+    @Json(name = "reply") val reply: String,
+    @Json(name = "songs") val songs: List<Song> = emptyList(),
+    @Json(name = "song") val song: Song? = null,
+    @Json(name = "atmosphereProfile") val atmosphereProfile: AtmosphereProfile? = null
 )

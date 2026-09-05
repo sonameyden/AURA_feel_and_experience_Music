@@ -1,22 +1,19 @@
-package com.aura.feature.playlist
+package com.aura.feature.library
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.aura.core.designsystem.components.AlbumArt
 import com.aura.core.designsystem.components.GlassCard
@@ -24,20 +21,21 @@ import com.aura.core.model.Song
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaylistDetailScreen(
-    playlistId: String,
+fun LikedSongsScreen(
     onBackClick: () -> Unit,
     onSongClick: (String) -> Unit,
-    viewModel: PlaylistViewModel = hiltViewModel()
+    viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isLight = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    
+    var songToAddToPlaylist by remember { mutableStateOf<Song?>(null) }
 
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Playlist", color = if (isLight) Color(0xFF29262D) else Color.White) },
+                title = { Text("Liked Songs", color = if (isLight) Color(0xFF29262D) else Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -52,44 +50,50 @@ fun PlaylistDetailScreen(
         }
     ) { padding ->
         when (val state = uiState) {
-            is PlaylistUiState.Loading -> {
+            is LibraryUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
-            is PlaylistUiState.Success -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 120.dp)
-                ) {
-                    item {
-                        Text(
-                            text = state.playlist.title,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = if (isLight) Color(0xFF29262D) else Color.White
-                            ),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+            is LibraryUiState.Success -> {
+                if (state.likedSongs.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No liked songs yet.", color = Color.Gray)
                     }
-
-                    items(state.songs) { song ->
-                        SongItem(
-                            song = song,
-                            isLight = isLight,
-                            onClick = {
-                                viewModel.onSongClick(song, state.songs)
-                                onSongClick(song.id)
-                            }
-                        )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            .padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 120.dp)
+                    ) {
+                        items(state.likedSongs) { song ->
+                            SongLibraryItem(
+                                song = song,
+                                isLight = isLight,
+                                onSongClick = {
+                                    viewModel.onSongClick(song, state.likedSongs)
+                                    onSongClick(song.id)
+                                },
+                                onAddClick = { songToAddToPlaylist = song }
+                            )
+                        }
                     }
                 }
+                
+                songToAddToPlaylist?.let { song ->
+                    AddToPlaylistDialog(
+                        playlists = state.playlists,
+                        onPlaylistSelected = { playlistId ->
+                            viewModel.addSongToPlaylist(playlistId, song.id)
+                        },
+                        onDismiss = { songToAddToPlaylist = null }
+                    )
+                }
             }
-            is PlaylistUiState.Error -> {
+            is LibraryUiState.Error -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(state.message, color = MaterialTheme.colorScheme.error)
                 }
@@ -99,8 +103,16 @@ fun PlaylistDetailScreen(
 }
 
 @Composable
-private fun SongItem(song: Song, isLight: Boolean, onClick: () -> Unit) {
-    GlassCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+private fun SongLibraryItem(
+    song: Song,
+    isLight: Boolean,
+    onSongClick: () -> Unit,
+    onAddClick: () -> Unit
+) {
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onSongClick
+    ) {
         Row(
             modifier = Modifier
                 .padding(12.dp)
@@ -112,7 +124,7 @@ private fun SongItem(song: Song, isLight: Boolean, onClick: () -> Unit) {
                 contentDescription = null,
                 modifier = Modifier.size(48.dp)
             )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
+            Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                 Text(
                     text = song.title,
                     fontWeight = FontWeight.SemiBold,
@@ -122,6 +134,13 @@ private fun SongItem(song: Song, isLight: Boolean, onClick: () -> Unit) {
                     text = song.artistName,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onAddClick) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.4f)
                 )
             }
         }

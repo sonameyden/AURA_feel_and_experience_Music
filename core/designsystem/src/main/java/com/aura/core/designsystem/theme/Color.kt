@@ -8,11 +8,18 @@ import androidx.compose.ui.graphics.Color
  * so it sits calmly between every environment's mood palette without competing.
  */
 
-// ---- Light theme ----
-val AuraPearlMist = Color(0xFFF4F1ED)      // Background
-val AuraWarmFog = Color(0xFFE9E4DE)        // Surface / Card
-val AuraDeepCharcoal = Color(0xFF211E1B)   // Primary text
-val AuraMutedTaupe = Color(0xFF7A736B)     // Secondary text
+// ---- Light theme (Premium Redesign) ----
+val AuraPearlMist = Color(0xFFF8F6F5)      // Base Background
+val AuraWarmFog = Color(0xFFF0ECE9)        // Surface / Card
+val AuraDeepCharcoal = Color(0xFF29262D)   // Primary text
+val AuraMutedTaupe = Color(0xFF77717A)     // Secondary text
+val AuraLightLavenderGlow = Color(0xFFEDE7F2)
+val AuraLightWarmGlow = Color(0xFFF3E8E4)
+val AuraSelectedNavLight = Color(0xFFE9DDF5)
+val AuraNavIconInactive = Color(0xFF625D66)
+val AuraNavIconActive = Color(0xFF403746)
+val AuraMoodPortalStart = Color(0xFFEEE8F0)
+val AuraMoodPortalEnd = Color(0xFFE8E1EA)
 
 // ---- Dark theme ----
 val AuraNearBlackViolet = Color(0xFF1C1A22) // Background (dark)

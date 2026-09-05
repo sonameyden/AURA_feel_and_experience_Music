@@ -5,16 +5,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 private val LightColors = lightColorScheme(
     primary = AuraVioletAccent,
-    onPrimary = AuraOffWhite,
+    onPrimary = Color.White,
     background = AuraPearlMist,
     onBackground = AuraDeepCharcoal,
     surface = AuraWarmFog,
     onSurface = AuraDeepCharcoal,
     secondary = AuraMutedTaupe,
-    onSecondary = AuraPearlMist
+    onSecondary = AuraPearlMist,
+    surfaceVariant = AuraSelectedNavLight,
+    onSurfaceVariant = AuraNavIconActive
 )
 
 private val DarkColors = darkColorScheme(

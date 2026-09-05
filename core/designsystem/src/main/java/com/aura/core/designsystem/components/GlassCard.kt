@@ -8,19 +8,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 
 /**
- * Soft "glass" surface used across Home for mood tiles, current-song card, etc.
- * This is one of the ways Home stays visually rich WITHOUT full-scene animation —
- * depth via subtle translucency/elevation rather than motion.
- *
- * @param accentColor optional tint (e.g. an environment's primary color) blended
- *   at low alpha into the card background — used for mood tiles / current song card.
- * @param onClick optional — when provided, the card becomes tappable and the
- *   ripple is clipped to the card's rounded shape (applying `.clickable`
- *   from outside the card does NOT clip correctly, so this is the supported way).
+ * Soft "glass" surface used across AURA. In Light Mode, it feels like
+ * translucent pearl glass with very soft depth.
  */
 @Composable
 fun GlassCard(
@@ -29,12 +25,30 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    val isLight = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     val base = MaterialTheme.colorScheme.surface
-    val background = accentColor?.let { base.copy(alpha = 0.92f).compositeOver(it, alpha = 0.12f) } ?: base
+    
+    val background = if (isLight) {
+        // Light Mode: Ethereal translucent pearl
+        accentColor?.let { Color.White.copy(alpha = 0.8f).compositeOver(it) } 
+            ?: Color.White.copy(alpha = 0.65f)
+    } else {
+        // Dark Mode: Muted translucent violet
+        accentColor?.let { base.copy(alpha = 0.92f).compositeOver(it) } ?: base
+    }
+
     val shape = RoundedCornerShape(20.dp)
+    val shadowColor = if (isLight) Color(0xFF29262D).copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.2f)
 
     Box(
         modifier = modifier
+            .shadow(
+                elevation = if (isLight) 4.dp else 0.dp,
+                shape = shape,
+                clip = false,
+                ambientColor = shadowColor,
+                spotColor = shadowColor
+            )
             .clip(shape)
             .background(background)
             .let { m -> if (onClick != null) m.clickable(onClick = onClick) else m }
@@ -43,12 +57,5 @@ fun GlassCard(
     }
 }
 
-// --- small local helper, kept private to this file ---
-private fun Color.compositeOver(accent: Color, alpha: Float): Color {
-    return Color(
-        red = red * (1 - alpha) + accent.red * alpha,
-        green = green * (1 - alpha) + accent.green * alpha,
-        blue = blue * (1 - alpha) + accent.blue * alpha,
-        alpha = 1f
-    )
-}
+// Helper removed as we use graphics.compositeOver now
+

@@ -1,5 +1,8 @@
 package com.aura.core.model
 
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
+
 /** How the environment's lighting layer should behave for the current moment in the song. */
 enum class LightingStyle {
     Soft,
@@ -51,8 +54,9 @@ enum class SongSection {
  * Optional override applied during a specific window of the song's playback,
  * e.g. "boost intensity 1.4x during the Chorus starting at 42s."
  */
+@JsonClass(generateAdapter = true)
 data class SongSectionProfile(
-    val section: SongSection,
-    val startTimeMs: Long,
-    val intensityMultiplier: Float
+    @Json(name = "section") val section: SongSection,
+    @Json(name = "start_time_ms") val startTimeMs: Long,
+    @Json(name = "intensity_multiplier") val intensityMultiplier: Float
 )

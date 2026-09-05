@@ -8,45 +8,22 @@ import com.aura.core.audio.AuraPlayer
 import com.aura.core.audio.PlaybackState
 import com.aura.core.common.util.AppResult
 import com.aura.core.data.remote.LyricsResponse
-import com.aura.core.data.repository.AtmosphereRepository
-import com.aura.core.data.repository.LyricsRepository
-import com.aura.core.data.repository.SongRepository
+import com.aura.core.data.repository.*
 import com.aura.core.model.AtmosphereProfile
 import com.aura.core.model.Song
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Drives the Now Playing screen. AuraPlayer is the single source of truth for
- * playback — this ViewModel never keeps its own "isPlaying"/position copy,
- * it only reads player.playbackState / player.currentPositionMs / player.hasNext
- * / player.hasPrevious and forwards user intents (play/pause/seek/skip) to it.
- *
- * If the caller (Home/Search) already started this song via
- * AuraPlayer.playQueue(...) before navigating here, we don't call play()
- * again — restarting an already-buffering song is what used to make the
- * screen feel like it needed a second tap. We only fall back to play(song)
- * when arriving here without an active matching song (e.g. a mood-input
- * deep link straight into Now Playing).
- *
- * Atmosphere and lyrics are also no longer awaited before the screen can
- * show anything — they load in the background and update in place, so
- * playback + controls appear immediately instead of sitting on a spinner
- * for a couple of network round-trips.
- */
 @HiltViewModel
 class NowPlayingViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val songRepository: SongRepository,
     private val atmosphereRepository: AtmosphereRepository,
     private val lyricsRepository: LyricsRepository,
+    private val libraryRepository: LibraryRepository,
     private val player: AuraPlayer,
     private val audioAnalyzer: AudioAnalyzer
 ) : ViewModel() {
@@ -56,14 +33,14 @@ class NowPlayingViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<NowPlayingUiState>(NowPlayingUiState.Loading)
     val uiState: StateFlow<NowPlayingUiState> = _uiState.asStateFlow()
 
+    private val isLikedFlow = MutableStateFlow(false)
+
     init {
         loadAndPlay()
     }
 
     private fun loadAndPlay() {
         viewModelScope.launch {
-            // Observe the player's playback state to detect when the song changes
-            // (e.g., via Next/Previous) and refresh atmosphere/lyrics accordingly.
             player.playbackState.collect { playback ->
                 val currentSong = when (playback) {
                     is PlaybackState.Playing -> playback.song
@@ -78,9 +55,6 @@ class NowPlayingViewModel @Inject constructor(
             }
         }
 
-        // If we arrived here and nothing is playing or it's the wrong song,
-        // force-start the requested songId. If it is already the current song
-        // but paused, resume it.
         viewModelScope.launch {
             if (!player.isCurrentSong(songId)) {
                 val songResult = songRepository.getSong(songId)
@@ -103,9 +77,11 @@ class NowPlayingViewModel @Inject constructor(
         if (song.id == lastLoadedSongId) return
         lastLoadedSongId = song.id
 
+        // Reset liked status for the new song immediately
+        isLikedFlow.value = false
+
         activeSongJob?.cancel()
         activeSongJob = viewModelScope.launch {
-            // Listen for the audio session ID to be allocated before attaching analyzer.
             launch {
                 player.audioSessionIdFlow.collect { sessionId ->
                     if (sessionId != 0) {
@@ -114,20 +90,36 @@ class NowPlayingViewModel @Inject constructor(
                 }
             }
 
+            launch {
+                libraryRepository.addToHistory(song.id)
+            }
+
             val atmosphereFlow = MutableStateFlow(AtmosphereProfile.loadingPlaceholder(song.id))
             val lyricsFlow = MutableStateFlow<LyricsResponse?>(null)
 
             launch {
-                val result = atmosphereRepository.getAtmosphereForSong(song.id)
-                (result as? AppResult.Success)?.data?.let { atmosphereFlow.value = it }
+                val result = libraryRepository.getLikedSongs()
+                if (result is AppResult.Success) {
+                    isLikedFlow.value = result.data.any { it.id == song.id }
+                }
             }
+
             launch {
-                // Safeguard: Do not fetch or display lyrics if the artist is "Unknown Artist"
-                // (Matches Section 26-28 of the spec: only verified/matched lyrics should render).
-                if (song.artistName != "Unknown Artist") {
-                    val result = lyricsRepository.getLyrics(song.id)
-                    (result as? AppResult.Success)?.data?.let { lyricsFlow.value = it }
+                val result = atmosphereRepository.getAtmosphereForSong(song.id)
+                if (result is AppResult.Success) {
+                    println("Atmosphere Loaded for ${song.title}: ${result.data}")
+                    atmosphereFlow.value = result.data
                 } else {
+                    println("Atmosphere Load FAILED for ${song.title}: ${(result as AppResult.Error).error}")
+                }
+            }
+            
+            launch {
+                val result = lyricsRepository.getLyrics(song.id)
+                if (result is AppResult.Success) {
+                    lyricsFlow.value = result.data
+                } else {
+                    println("Lyrics Load FAILED for ${song.title}")
                     lyricsFlow.value = null
                 }
             }
@@ -145,9 +137,17 @@ class NowPlayingViewModel @Inject constructor(
                 playbackSnapshot,
                 atmosphereFlow,
                 lyricsFlow,
+                isLikedFlow,
                 player.hasNext,
                 player.hasPrevious
-            ) { snapshot, atmosphere, lyrics, hasNext, hasPrevious ->
+            ) { args ->
+                val snapshot = args[0] as PlaybackSnapshot
+                val atmosphere = args[1] as AtmosphereProfile
+                val lyrics = args[2] as? LyricsResponse
+                val isLiked = args[3] as Boolean
+                val hasNext = args[4] as Boolean
+                val hasPrevious = args[5] as Boolean
+
                 NowPlayingUiState.Ready(
                     playbackState = snapshot.playback,
                     currentPositionMs = snapshot.position,
@@ -156,7 +156,8 @@ class NowPlayingViewModel @Inject constructor(
                     liveAudioEnergy = snapshot.energy,
                     beatPulse = snapshot.beat,
                     hasNext = hasNext,
-                    hasPrevious = hasPrevious
+                    hasPrevious = hasPrevious,
+                    isLiked = isLiked
                 )
             }.collect { newState ->
                 _uiState.update { newState }
@@ -177,6 +178,27 @@ class NowPlayingViewModel @Inject constructor(
     fun onPreviousClick() = player.skipToPrevious()
 
     fun onSeek(positionMs: Long) = player.seekTo(positionMs)
+
+    fun onLikeClick() {
+        val songId = lastLoadedSongId ?: return
+        val currentLiked = isLikedFlow.value
+        
+        viewModelScope.launch {
+            // Optimistic update
+            isLikedFlow.value = !currentLiked
+            
+            val result = if (currentLiked) {
+                libraryRepository.unlikeSong(songId)
+            } else {
+                libraryRepository.likeSong(songId)
+            }
+            
+            if (result is AppResult.Error) {
+                // Rollback on failure
+                isLikedFlow.value = currentLiked
+            }
+        }
+    }
 
     override fun onCleared() {
         audioAnalyzer.detach()

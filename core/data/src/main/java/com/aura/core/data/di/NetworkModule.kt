@@ -3,6 +3,7 @@ package com.aura.core.data.di
 import com.aura.core.auth.AuthRepository
 import com.aura.core.data.remote.AtmosphereApi
 import com.aura.core.data.remote.CatalogApi
+import com.aura.core.data.remote.LibraryApi
 import com.aura.core.data.remote.LyricsApi
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -89,6 +90,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAtmosphereApi(retrofit: Retrofit): AtmosphereApi = retrofit.create(AtmosphereApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideLibraryApi(retrofit: Retrofit): LibraryApi = retrofit.create(LibraryApi::class.java)
 
     @Provides
     @Singleton

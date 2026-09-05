@@ -106,24 +106,32 @@ class SongRepository @Inject constructor(
             )
         }
 
-    suspend fun uploadSong(title: String, genre: String, file: File): AppResult<Song> =
-        withContext(dispatchers.io) {
-            runCatching {
-                val titlePart = title.toRequestBody("text/plain".toMediaType())
-                val genrePart = genre.toRequestBody("text/plain".toMediaType())
-                val filePart = MultipartBody.Part.createFormData(
-                    "audioFile",
-                    file.name,
-                    file.asRequestBody("audio/*".toMediaType())
-                )
-                val remote = catalogApi.uploadSong(titlePart, genrePart, filePart)
-                songDao.upsert(SongEntity.fromDomain(remote))
-                remote
-            }.fold(
-                onSuccess = { AppResult.Success(it) },
-                onFailure = { AppResult.Error(it.toAppError()) }
+    suspend fun uploadSong(
+        title: String,
+        artistName: String,
+        genre: String,
+        durationMs: Long,
+        file: File
+    ): AppResult<Song> = withContext(dispatchers.io) {
+        runCatching {
+            val titlePart = title.toRequestBody("text/plain".toMediaType())
+            val artistPart = artistName.toRequestBody("text/plain".toMediaType())
+            val genrePart = genre.toRequestBody("text/plain".toMediaType())
+            val durationPart = durationMs.toString().toRequestBody("text/plain".toMediaType())
+            
+            val filePart = MultipartBody.Part.createFormData(
+                "file", // The backend parameter name is 'file' based on the requested signature
+                file.name,
+                file.asRequestBody("audio/*".toMediaType())
             )
-        }
+            val remote = catalogApi.uploadSong(filePart, titlePart, artistPart, genrePart, durationPart)
+            songDao.upsert(SongEntity.fromDomain(remote))
+            remote
+        }.fold(
+            onSuccess = { AppResult.Success(it) },
+            onFailure = { AppResult.Error(it.toAppError()) }
+        )
+    }
 }
 
 /** Shared exception -> AppError mapping, used across every repository in this module. */

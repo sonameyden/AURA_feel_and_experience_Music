@@ -1,5 +1,7 @@
 package com.aura.core.data.remote
 
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 import retrofit2.http.GET
 import retrofit2.http.Path
 
@@ -13,14 +15,16 @@ interface LyricsApi {
     suspend fun getLyrics(@Path("songId") songId: String): LyricsResponse
 }
 
+@JsonClass(generateAdapter = true)
 data class LyricsResponse(
-    val songId: String,
-    val lines: List<LyricLine>
+    @Json(name = "song_id") val songId: String,
+    @Json(name = "lines") val lines: List<LyricLine> = emptyList()
 )
 
+@JsonClass(generateAdapter = true)
 data class LyricLine(
-    val id: String,
-    val text: String,
-    val startTimeMs: Long,
-    val endTimeMs: Long
+    @Json(name = "id") val id: String,
+    @Json(name = "text") val text: String = "",
+    @Json(name = "start_time_ms") val startTimeMs: Long = 0,
+    @Json(name = "end_time_ms") val endTimeMs: Long = 0
 )

@@ -27,6 +27,9 @@ interface CatalogApi {
     @GET("catalog/artists/{id}")
     suspend fun getArtist(@Path("id") id: String): Artist
 
+    @GET("catalog/songs/artist/{artistId}")
+    suspend fun getSongsByArtist(@Path("artistId") artistId: String): List<Song>
+
     @GET("catalog/albums/{id}")
     suspend fun getAlbum(@Path("id") id: String): Album
 
@@ -42,8 +45,10 @@ interface CatalogApi {
     @Multipart
     @POST("catalog/songs/upload")
     suspend fun uploadSong(
+        @Part file: MultipartBody.Part,
         @Part("title") title: RequestBody,
+        @Part("artistName") artistName: RequestBody,
         @Part("genre") genre: RequestBody,
-        @Part audioFile: MultipartBody.Part
+        @Part("durationMs") durationMs: RequestBody
     ): Song
 }

@@ -18,8 +18,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +38,7 @@ fun MoodInputScreen(
 ) {
     var text by remember { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
+    val isLight = MaterialTheme.colorScheme.surface.luminance() > 0.5f
 
     LaunchedEffect(uiState) {
         if (uiState is MoodInputUiState.DirectPlay) {
@@ -47,7 +50,9 @@ fun MoodInputScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(
+                if (isLight) Brush.verticalGradient(
+                    colors = listOf(Color(0xFFF8F6F5), Color(0xFFFAF9F7))
+                ) else Brush.verticalGradient(
                     colors = listOf(Color(0xFF1C1A22), Color(0xFF26232D))
                 )
             )
@@ -58,11 +63,11 @@ fun MoodInputScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(80.dp))
 
             Text(
                 text = "How are you feeling?",
-                color = Color.White,
+                color = if (isLight) Color(0xFF29262D) else Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
@@ -70,7 +75,7 @@ fun MoodInputScreen(
             
             Text(
                 text = "AURA's AI will find the perfect world for you.",
-                color = Color.White.copy(alpha = 0.7f),
+                color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.7f),
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
@@ -82,12 +87,12 @@ fun MoodInputScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 20.dp),
-                placeholder = { Text("I feel lonely and peaceful...", color = Color.Gray) },
+                placeholder = { Text("I feel lonely and peaceful...", color = if (isLight) Color.Gray.copy(alpha = 0.5f) else Color.Gray) },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = if (isLight) Color(0xFF29262D) else Color.White,
+                    unfocusedTextColor = if (isLight) Color(0xFF29262D) else Color.White,
                     focusedBorderColor = Color(0xFFA79AC7),
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
+                    unfocusedBorderColor = if (isLight) Color.Black.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.3f),
                     cursorColor = Color(0xFFA79AC7)
                 ),
                 shape = RoundedCornerShape(16.dp)
@@ -97,7 +102,8 @@ fun MoodInputScreen(
                 onClick = { if (text.isNotBlank()) viewModel.onSubmit(text) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .shadow(if (isLight) 8.dp else 0.dp, RoundedCornerShape(16.dp), spotColor = Color(0xFFA79AC7).copy(alpha = 0.3f)),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFA79AC7),
@@ -148,7 +154,7 @@ fun MoodInputScreen(
                 ) {
                     Text(
                         text = results.reply,
-                        color = Color.White.copy(alpha = 0.9f),
+                        color = if (isLight) Color(0xFF302D33) else Color.White.copy(alpha = 0.9f),
                         fontSize = 16.sp,
                         fontStyle = FontStyle.Italic,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -156,7 +162,7 @@ fun MoodInputScreen(
 
                     Text(
                         text = "Try these environments:",
-                        color = Color.White.copy(alpha = 0.6f),
+                        color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.6f),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -180,8 +186,16 @@ fun MoodInputScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = song.title, color = Color.White, fontWeight = FontWeight.Bold)
-                                        Text(text = song.artistName, color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
+                                        Text(
+                                            text = song.title, 
+                                            color = if (isLight) Color(0xFF29262D) else Color.White, 
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = song.artistName, 
+                                            color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.6f), 
+                                            fontSize = 14.sp
+                                        )
                                     }
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
@@ -204,13 +218,13 @@ fun MoodInputScreen(
                 .padding(16.dp)
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.1f))
+                .background(if (isLight) Color.Black.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.1f))
                 .align(Alignment.TopStart)
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = Color.White,
+                tint = if (isLight) Color(0xFF29262D) else Color.White,
                 modifier = Modifier.size(22.dp)
             )
         }

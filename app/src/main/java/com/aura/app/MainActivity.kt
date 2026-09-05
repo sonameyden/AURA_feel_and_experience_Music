@@ -2,6 +2,7 @@ package com.aura.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -11,6 +12,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
@@ -38,6 +43,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
+        // Ensure system bars are fully transparent and don't show weird lines on some devices
+        window.navigationBarColor = Color.TRANSPARENT
+        window.statusBarColor = Color.TRANSPARENT
+        
         checkAndRequestPermissions()
 
         setContent {
@@ -58,10 +67,16 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AuraApp() {
-    AuraTheme {
+    var isDarkTheme by remember { mutableStateOf(true) } // Default to dark for the "Aura" vibe
+    
+    AuraTheme(darkTheme = isDarkTheme) {
         Surface(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
-            AuraNavHost(navController = navController)
+            AuraNavHost(
+                navController = navController,
+                darkTheme = isDarkTheme,
+                onThemeChange = { isDarkTheme = it }
+            )
         }
     }
 }
