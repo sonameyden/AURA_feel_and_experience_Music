@@ -5,14 +5,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import com.aura.core.model.AtmosphereProfile
+import kotlin.math.sin
 
 /**
- * Melancholic -- rain-streaked window over an indigo/slate sky, per the
- * concept spec's Section 8 description ("window frame, rain streaks, city
- * skyline"). Rain fall-speed quickens with music energy.
+ * Melancholic -- Extreme Fidelity (Forest Path):
+ *  1. Deep Indigo/Atmospheric Sky (Layer 1)
+ *  2. Hazy Distant Forest Silhouettes (Layer 2)
+ *  3. Tall Midground Trees & Stone Path (Layer 3)
+ *  4. Dark Foreground Framing Branches (Layer 4)
+ *  5. Forest Floor Surface & Ledge (Layer 5)
+ *  6. Atmospheric God Rays (Layer 6)
  */
 @Composable
 fun MelancholicBackground(
@@ -22,38 +26,52 @@ fun MelancholicBackground(
     modifier: Modifier = Modifier
 ) {
     EnvironmentCanvas(profile, liveAudioEnergy, beatPulse, modifier, "melancholic") { colors, energy, brightness, timeMs ->
-        val secondary = colors.getOrElse(1) { colors[0] }
+        val primary = colors[0]
 
-        // Layer 1: dim indigo sky
+        // Layer 1: Sky Gradient
         drawRect(
             brush = Brush.verticalGradient(
-                listOf(colors[0].copy(alpha = 0.55f * brightness), Color(0xFF15131C).copy(alpha = 0.85f * brightness))
+                listOf(Color(0xFF2B2D42).copy(alpha = 0.8f * brightness), Color(0xFFC78170).copy(alpha = 0.4f * brightness))
             )
         )
 
-        // Layer 2: rain streaks -- fall speed reacts inversely to energy (heavier rain = faster)
-        for (i in 0 until 26) {
-            val seed = i * 71
-            val xFrac = ((seed * 31) % 100) / 100f
-            val speed = 700f - energy * 300f
-            val fall = ((timeMs / speed) + (seed % 50) / 50f) % 1.2f
-            val yStart = size.height * (fall - 0.2f)
-            drawLine(
-                color = secondary.copy(alpha = 0.35f * brightness),
-                start = Offset(size.width * xFrac, yStart),
-                end = Offset(size.width * xFrac - 6f, yStart + 26f),
-                strokeWidth = 1.5f,
-                cap = StrokeCap.Round
-            )
+        // Layer 6: God Rays
+        drawLightRays(
+            center = Offset(size.width * 0.25f, 0f),
+            rayCount = 4,
+            angleOffset = 30f + sin(timeMs / 4500f) * 4f,
+            rayLength = size.height * 1.3f,
+            rayWidth = 140f,
+            color = Color(0xFFFFFDE7).copy(alpha = 0.08f * brightness)
+        )
+
+        // Layer 2: Distant Forest Silhouettes
+        drawRollingHills(
+            yBase = size.height * 0.55f,
+            amplitude = 30f,
+            color = Color(0xFF3F3D56),
+            brightness = 0.4f * brightness
+        )
+
+        // Layer 3: Tall Trees
+        val sway = sin(timeMs / 1300f) * 1.5f
+        listOf(0.12f, 0.28f, 0.78f).forEachIndexed { i, x ->
+            rotate(degrees = sway * (if(i%2==0)1f else -1f), pivot = Offset(size.width * x, size.height * 0.75f)) {
+                drawTree(Offset(size.width * x, size.height * 0.75f), 1.1f + i * 0.15f, Color(0xFF2B3D2C))
+            }
         }
 
-        // Layer 3: window frame
-        val frameColor = Color(0xFF1C1A22).copy(alpha = 0.4f * brightness)
-        drawLine(frameColor, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), strokeWidth = 4f)
-        drawLine(frameColor, Offset(0f, size.height * 0.4f), Offset(size.width, size.height * 0.4f), strokeWidth = 4f)
-        drawRect(color = frameColor, topLeft = Offset.Zero, size = size, style = Stroke(width = 6f))
+        // Layer 4 & 5: Forest Floor & Framing
+        drawRollingHills(
+            yBase = size.height * 0.85f,
+            amplitude = 20f,
+            color = Color(0xFF1E281F),
+            brightness = 1.0f * brightness
+        )
+        
+        drawForestFraming(Color(0xFF141A15), brightness)
 
-        // Layer 5: windowsill (resting ledge)
+        // Final Ledge
         drawRestingLedge()
     }
 }

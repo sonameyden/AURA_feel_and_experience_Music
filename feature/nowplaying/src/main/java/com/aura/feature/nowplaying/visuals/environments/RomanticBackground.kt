@@ -3,6 +3,7 @@ package com.aura.feature.nowplaying.visuals.environments
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -10,11 +11,12 @@ import com.aura.core.model.AtmosphereProfile
 import kotlin.math.sin
 
 /**
- * Romantic -- matches romantic.jpg's layer stack:
- *  1. Sunset sky + glow
- *  3. Midground swaying flower row (sway reacts to energy)
- *  4/5. Foreground flower field + garden path ledge
- *  6. Drifting petals
+ * Romantic -- Extreme Fidelity:
+ *  1. Deep Sunset Sky & Glow (Layer 1)
+ *  2. Distant Garden Structures (Layer 2)
+ *  3. Midground Curving Path & Trees (Layer 3)
+ *  4. Foreground Rose Garden (Layer 4/5)
+ *  5. Drifting Petals (Layer 6)
  */
 @Composable
 fun RomanticBackground(
@@ -25,43 +27,60 @@ fun RomanticBackground(
 ) {
     EnvironmentCanvas(profile, liveAudioEnergy, beatPulse, modifier, "romantic") { colors, energy, brightness, timeMs ->
         val primary = colors[0]
-        val secondary = colors.getOrElse(1) { primary }
-        val tertiary = colors.getOrElse(2) { secondary }
+        val secondary = colors.getOrElse(1) { colors.last() }
 
-        // Layer 1: sunset sky + glow
+        // Layer 1: Sunset sky
         drawRect(
             brush = Brush.verticalGradient(
-                listOf(Color(0xFFF5D6DE).copy(alpha = 0.5f * brightness), Color(0xFFFBEFEA).copy(alpha = 0.9f * brightness))
+                listOf(Color(0xFFD47A95).copy(alpha = 0.6f * brightness), Color(0xFFFFD4A9).copy(alpha = 0.85f * brightness))
             )
         )
+        // Sunset Sun
         drawCircle(
-            brush = Brush.radialGradient(listOf(secondary.copy(alpha = 0.6f * brightness), Color.Transparent)),
-            radius = size.minDimension * 0.45f,
-            center = Offset(size.width * 0.5f, size.height * 0.4f)
+            brush = Brush.radialGradient(listOf(Color.White.copy(alpha = 0.45f * brightness), Color.Transparent)),
+            radius = size.width * 0.45f,
+            center = Offset(size.width * 0.5f, size.height * 0.35f)
         )
 
-        // Layer 3/4: swaying flower row -- sway amplitude tracks energy
-        val sway = sin(timeMs / 1000f) * (3f + energy * 5f)
-        for (i in 0 until 6) {
-            val xFrac = 0.1f + i * 0.16f
-            rotate(degrees = sway * (if (i % 2 == 0) 1f else -1f), pivot = Offset(size.width * xFrac, size.height * 0.92f)) {
-                drawFlower(Offset(size.width * xFrac, size.height * 0.9f), 10f, primary, tertiary)
+        // Layer 2: Distant structures
+        drawRollingHills(
+            yBase = size.height * 0.58f,
+            amplitude = 35f,
+            color = Color(0xFF8B5E6D),
+            brightness = 0.45f * brightness
+        )
+
+        // Layer 3: Midground soft hills
+        drawRollingHills(
+            yBase = size.height * 0.72f,
+            amplitude = 50f,
+            color = secondary.copy(alpha = 0.75f),
+            brightness = 0.8f * brightness
+        )
+
+        // Layer 4 & 5: Foreground Flower Garden
+        val sway = sin(timeMs / 1000f) * (3f + energy * 6f)
+        for (i in 0 until 9) {
+            val x = size.width * (0.05f + i * 0.11f)
+            val y = size.height * (0.84f + (i % 3) * 0.03f)
+            rotate(degrees = sway * (if(i%2==0)1f else -1f), pivot = Offset(x, y)) {
+                drawFlower(Offset(x, y), 14f, secondary, primary)
             }
         }
 
-        // Layer 6: drifting petals
-        for (i in 0 until 8) {
-            val speed = 5000f + i * 400f
-            val yFrac = ((timeMs / speed) + i * 0.2f) % 1f
-            val xFrac = 0.1f + ((i * 53) % 80) / 100f + sin(timeMs / 900f + i) * 0.03f
-            drawCircle(
-                color = tertiary.copy(alpha = 0.5f * (1f - yFrac) * brightness),
-                radius = 3f,
-                center = Offset(size.width * xFrac, size.height * (1f - yFrac))
+        // Layer 6: Drifting Petals
+        for (i in 0 until 12) {
+            val phase = timeMs / (4500f + i * 400f)
+            val px = size.width * (0.1f + ((i * 31) % 80) / 100f + sin(phase * 1.5f) * 0.04f)
+            val py = size.height * (1f - (phase % 1.1f))
+            drawOval(
+                color = secondary.copy(alpha = 0.6f * (1f - (phase % 1.1f)) * brightness),
+                topLeft = Offset(px, py),
+                size = Size(8f, 5f)
             )
         }
 
-        // Layer 5: garden path / resting ledge
+        // Final Ledge
         drawRestingLedge()
     }
 }

@@ -5,18 +5,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.rotate
 import com.aura.core.model.AtmosphereProfile
 import kotlin.math.sin
 
 /**
- * Nature -- matches nature.jpg's layer stack:
- *  1. Sky gradient
- *  2. Distant mountain haze / sun glow
- *  3. Midground rolling hill bands
- *  4. Foreground scenery: swaying trees (sway speed/amplitude reacts to energy)
- *  5. Foreground resting ledge with grass
+ * Nature -- Extreme Fidelity:
+ *  1. Base Sky Gradient (Layer 1)
+ *  2. Distant Mountains & Haze (Layer 2)
+ *  3. Midground Rolling Meadow Hills (Layer 3 - Bezier curves)
+ *  4. Tall Midground Trees (Layer 4)
+ *  5. Foreground Grass & Detailed Ledge (Layer 5)
  */
 @Composable
 fun NatureBackground(
@@ -27,49 +26,52 @@ fun NatureBackground(
 ) {
     EnvironmentCanvas(profile, liveAudioEnergy, beatPulse, modifier, "nature") { colors, energy, brightness, timeMs ->
         val primary = colors[0]
-        val secondary = colors.getOrElse(1) { primary }
-        val tertiary = colors.getOrElse(2) { secondary }
+        val secondary = colors.getOrElse(1) { colors.last() }
 
         // Layer 1: sky gradient
         drawRect(
             brush = Brush.verticalGradient(
-                listOf(primary.copy(alpha = 0.5f * brightness), Color(0xFFEFF7EE).copy(alpha = 0.9f * brightness))
+                listOf(Color(0xFFCEE0F4).copy(alpha = 0.6f * brightness), Color.White.copy(alpha = 0.8f * brightness))
             )
         )
 
-        // Layer 2: distant sun glow / haze
-        drawCircle(
-            brush = Brush.radialGradient(listOf(Color(0xFFFFE9B0).copy(alpha = 0.5f * brightness), Color.Transparent)),
-            radius = size.minDimension * 0.3f,
-            center = Offset(size.width * 0.8f, size.height * 0.2f)
+        // Layer 2: Distant mountain haze
+        drawRollingHills(
+            yBase = size.height * 0.48f,
+            amplitude = 40f,
+            color = Color(0xFFAAB8C2),
+            brightness = 0.4f * brightness
         )
 
-        // Layer 3: rolling hill bands (back to front)
-        listOf(tertiary.copy(alpha = 0.9f), secondary.copy(alpha = 0.95f), primary).forEachIndexed { i, color ->
-            val baseY = size.height * (0.62f + i * 0.13f)
-            val path = Path().apply {
-                moveTo(0f, size.height)
-                lineTo(0f, baseY)
-                cubicTo(
-                    size.width * 0.3f, baseY - size.height * 0.06f,
-                    size.width * 0.7f, baseY + size.height * 0.05f,
-                    size.width, baseY - size.height * 0.03f
-                )
-                lineTo(size.width, size.height)
-                close()
-            }
-            drawPath(path, color = color.copy(alpha = color.alpha * brightness))
-        }
+        // Layer 3: Midground soft rolling hills
+        drawRollingHills(
+            yBase = size.height * 0.62f,
+            amplitude = 60f,
+            color = secondary.copy(alpha = 0.85f),
+            brightness = 0.8f * brightness,
+            timeOffset = timeMs / 10000f // Very slow drift
+        )
 
-        // Layer 4: swaying trees -- sway amplitude tracks music energy
-        val sway = sin(timeMs / 900f) * (2f + energy * 6f)
-        listOf(0.2f, 0.35f, 0.82f).forEachIndexed { i, xFrac ->
-            rotate(degrees = sway * (if (i % 2 == 0) 1f else -1f), pivot = Offset(size.width * xFrac, size.height * 0.78f)) {
-                drawTree(Offset(size.width * xFrac, size.height * 0.78f), 0.7f + i * 0.15f, secondary)
+        // Layer 4: Tall Trees
+        val treeSway = sin(timeMs / 1200f) * (1.5f + energy * 3f)
+        listOf(0.18f, 0.35f, 0.85f).forEachIndexed { i, xFrac ->
+            rotate(degrees = treeSway * (if(i%2==0)1f else -1f), pivot = Offset(size.width * xFrac, size.height * 0.72f)) {
+                drawTree(Offset(size.width * xFrac, size.height * 0.72f), 0.9f + i * 0.1f, primary)
             }
         }
 
-        // Layer 5: foreground resting ledge
+        // Layer 5: Foreground Scenery Framing (Bottom grass silhouette)
+        drawRollingHills(
+            yBase = size.height * 0.82f,
+            amplitude = 25f,
+            color = primary,
+            brightness = 1.0f * brightness
+        )
+        
+        // Optional Framing (Layer 4 from moodboard)
+        drawForestFraming(primary, brightness)
+
+        // Final Ledge
         drawRestingLedge()
     }
 }

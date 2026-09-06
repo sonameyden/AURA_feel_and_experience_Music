@@ -6,15 +6,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.aura.core.model.AtmosphereProfile
+import kotlin.math.sin
 
 /**
- * Hopeful -- matches hopeful.jpg's layer stack:
- *  1. Sunrise sky gradient
- *  2. Distant mountain-silhouette glow that brightens over a slow cycle
- *     (swap `cycle` for real song-position progress once section timestamps
- *     are wired -- same idea KaleidoscopeLayer's `progress` param uses)
- *  4/5. Foreground hill / resting ledge
- *  6. Light rays -- intensity gets a boost from live music energy
+ * Hopeful -- Extreme Fidelity:
+ *  1. Sunrise Sky Gradient (Layer 1)
+ *  2. Distant Horizon Glow (Layer 2)
+ *  3. Midground Rolling Landscape & Path (Layer 3 - Bezier)
+ *  4. Foreground Soft Hill (Layer 4)
+ *  5. Radiating God Rays & Motes (Layer 6)
  */
 @Composable
 fun HopefulBackground(
@@ -23,46 +23,71 @@ fun HopefulBackground(
     beatPulse: Boolean,
     modifier: Modifier = Modifier
 ) {
-    EnvironmentCanvas(profile, liveAudioEnergy, beatPulse, modifier, "hopeful") { _, energy, brightness, timeMs ->
-        // Layer 1: sunrise sky gradient
+    EnvironmentCanvas(profile, liveAudioEnergy, beatPulse, modifier, "hopeful") { colors, energy, brightness, timeMs ->
+        // Layer 1: Sky
         drawRect(
             brush = Brush.verticalGradient(
-                listOf(Color(0xFF7EA8D8).copy(alpha = 0.5f * brightness), Color(0xFFF3D9A6).copy(alpha = 0.85f * brightness))
+                listOf(Color(0xFF7DA8D8).copy(alpha = 0.55f * brightness), Color(0xFFF4DAB0).copy(alpha = 0.85f * brightness))
             )
         )
 
-        val cycle = (timeMs / 12000f) % 1f
-        val horizonY = size.height * 0.62f
-        val glowColors = listOf(Color(0xFF9AC1E0), Color(0xFFF3C9A6), Color(0xFFE8B84B))
+        val cycle = (timeMs / 10000f) % 1f
+        val horizonY = size.height * 0.64f
+        val glowColors = listOf(Color(0xFF9BC1E0), Color(0xFFF3C9A6), Color(0xFFE8B84B))
         val scaled = cycle * (glowColors.size - 1)
         val lowIndex = scaled.toInt().coerceIn(0, glowColors.size - 2)
         val blended = lerpColor(glowColors[lowIndex], glowColors[lowIndex + 1], scaled - lowIndex)
 
-        // Layer 2: distant horizon glow that brightens over the cycle
+        // Layer 2: Distant Horizon Glow
         drawCircle(
-            brush = Brush.radialGradient(listOf(blended.copy(alpha = (0.4f + cycle * 0.4f) * brightness), Color.Transparent)),
-            radius = size.minDimension * (0.35f + cycle * 0.25f),
+            brush = Brush.radialGradient(
+                listOf(blended.copy(alpha = (0.45f + cycle * 0.35f) * brightness), Color.Transparent),
+                center = Offset(size.width * 0.5f, horizonY),
+                radius = size.width * (0.35f + cycle * 0.2f)
+            ),
+            radius = size.width,
             center = Offset(size.width * 0.5f, horizonY)
         )
-        drawLine(
-            color = blended.copy(alpha = 0.6f * brightness),
-            start = Offset(0f, horizonY),
-            end = Offset(size.width, horizonY),
-            strokeWidth = 2f
+
+        // Layer 3: Midground Landscape
+        drawRollingHills(
+            yBase = size.height * 0.68f,
+            amplitude = 45f,
+            color = Color(0xFFD6B998).copy(alpha = 0.65f),
+            brightness = brightness
         )
 
-        // Layer 6: light rays -- alpha gets a boost from live music energy on top of the cycle
-        for (i in 0 until 5) {
-            val rayAlpha = (0.08f + cycle * 0.12f + energy * 0.1f) * brightness
-            drawLine(
-                color = Color.White.copy(alpha = rayAlpha),
-                start = Offset(size.width * 0.5f, horizonY),
-                end = Offset(size.width * (0.2f + i * 0.15f), 0f),
-                strokeWidth = 3f
+        // Layer 5: Dynamic Light Rays
+        drawLightRays(
+            center = Offset(size.width * 0.5f, horizonY),
+            rayCount = 6,
+            angleOffset = -15f + energy * 8f,
+            rayLength = size.height * 0.7f,
+            rayWidth = 45f,
+            color = Color.White.copy(alpha = (0.06f + cycle * 0.1f + energy * 0.05f) * brightness)
+        )
+
+        // Layer 4: Foreground Hill
+        drawRollingHills(
+            yBase = size.height * 0.86f,
+            amplitude = 30f,
+            color = Color(0xFFB59A73),
+            brightness = brightness
+        )
+
+        // Floating Motes
+        for (i in 0 until 12) {
+            val sx = ((i * 67) % 100) / 100f
+            val sy = 0.25f + ((i * 41) % 55) / 100f
+            val alpha = (0.15f + energy * 0.35f) * ((sin(timeMs / 1200f + i) + 1f) / 2f)
+            drawCircle(
+                color = Color.White.copy(alpha = alpha * brightness),
+                radius = 1.3f,
+                center = Offset(size.width * sx, size.height * sy)
             )
         }
 
-        // Layer 4/5: foreground hill / resting ledge
+        // Final Ledge
         drawRestingLedge()
     }
 }
