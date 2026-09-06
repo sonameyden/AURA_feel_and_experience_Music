@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.aura.core.audio.PlaybackState
+import com.aura.feature.nowplaying.visuals.CatCompanion
 import com.aura.feature.nowplaying.visuals.EnvironmentBackground
 import com.aura.feature.nowplaying.visuals.KaleidoscopeLayer
 import com.aura.feature.nowplaying.visuals.LyricsOverlay
@@ -69,6 +70,14 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
+                CatCompanion(
+                    behaviorState = profile.catBehavior,
+                    liveAudioEnergy = state.liveAudioEnergy,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 180.dp, end = 24.dp)
+                )
+
                 val song = (state.playbackState as? PlaybackState.Playing)?.song
                     ?: (state.playbackState as? PlaybackState.Paused)?.song
                 val durationMs = (state.playbackState as? PlaybackState.Playing)?.durationMs
@@ -100,13 +109,14 @@ fun NowPlayingScreen(
                             .windowInsetsPadding(WindowInsets.navigationBars),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        val lyricsModifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
                         LyricsOverlay(
                             currentLine = currentLine,
                             isResonant = currentLine != null && (
                                 currentLine.id in profile.resonantLyricLineIds || 
                                 currentLine.text in profile.resonantLyricLineIds
                             ),
-                            modifier = Modifier.padding(horizontal = 24.dp)
+                            modifier = lyricsModifier
                         )
 
                         PlayerControls(

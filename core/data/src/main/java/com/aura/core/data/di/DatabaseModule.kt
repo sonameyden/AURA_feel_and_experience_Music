@@ -22,7 +22,7 @@ object DatabaseModule {
     @Singleton
     fun provideAuraDatabase(@ApplicationContext context: Context): AuraDatabase =
         Room.databaseBuilder(context, AuraDatabase::class.java, "aura.db")
-            .fallbackToDestructiveMigration() // fine for prototype; replace with real migrations before release
+            .fallbackToDestructiveMigration(dropAllTables = true) // fine for prototype; replace with real migrations before release
             .build()
 
     @Provides

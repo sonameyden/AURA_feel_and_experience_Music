@@ -1,7 +1,5 @@
 package com.aura.feature.nowplaying.visuals
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -22,14 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
-import com.aura.core.designsystem.components.GlassCard
 import java.util.Locale
 import kotlin.math.roundToLong
 
@@ -55,175 +52,147 @@ fun PlayerControls(
     val accent = runCatching { Color(accentHex.toColorInt()) }
         .getOrDefault(Color(0xFFA79AC7))
 
-    Box(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp) // Wider card (less padding on sides)
-            .padding(bottom = 12.dp)    // Brought down closer to the bottom
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        GlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 32.dp 
+        // --- Song Info (Centered) ---
+        Text(
+            text = songTitle,
+            color = Color.White,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = artistName,
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.clickable(onClick = onArtistClick)
+        )
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // --- Progress Bar (White track/thumb) ---
+        var isDragging by remember { mutableStateOf(false) }
+        var dragValue by remember { mutableFloatStateOf(0f) }
+        val safeDuration = durationMs.coerceAtLeast(1L)
+        val sliderValue = if (isDragging) dragValue else (positionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
+
+        Slider(
+            value = sliderValue,
+            onValueChange = {
+                isDragging = true
+                dragValue = it
+            },
+            onValueChangeFinished = {
+                onSeek((dragValue * safeDuration).roundToLong())
+                isDragging = false
+            },
+            colors = SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = Color.White,
+                inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(vertical = 14.dp, horizontal = 20.dp) // Shorter height
-                    .fillMaxWidth()
-            ) {
-                // --- Top: Info + Like ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically, // Center vertically to save space
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = songTitle,
-                            color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = artistName,
-                            color = Color.White.copy(alpha = 0.5f),
-                            fontSize = 14.sp,
-                            modifier = Modifier
-                                .clickable(onClick = onArtistClick)
-                        )
-                    }
+            Text(
+                text = formatMs(if (isDragging) (dragValue * safeDuration).roundToLong() else positionMs),
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 12.sp
+            )
+            val remainingMs = (durationMs - positionMs).coerceAtLeast(0L)
+            Text(
+                text = "-${formatMs(remainingMs)}",
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 12.sp
+            )
+        }
 
-                    // Heart button
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
-                            .clickable(onClick = onLikeClick),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Like",
-                            tint = if (isLiked) accent else Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+        Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(8.dp)) // Much shorter spacer
-
-                // --- Middle: Progress Bar ---
-                var isDragging by remember { mutableStateOf(false) }
-                var dragValue by remember { mutableFloatStateOf(0f) }
-                val safeDuration = durationMs.coerceAtLeast(1L)
-                val sliderValue = if (isDragging) dragValue else (positionMs.toFloat() / safeDuration).coerceIn(0f, 1f)
-
-                Slider(
-                    value = sliderValue,
-                    onValueChange = {
-                        isDragging = true
-                        dragValue = it
-                    },
-                    onValueChangeFinished = {
-                        onSeek((dragValue * safeDuration).roundToLong())
-                        isDragging = false
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.Transparent, 
-                        activeTrackColor = accent,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.12f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(24.dp) // Even shorter slider height
+        // --- Playback Controls Row ---
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Heart Button (Left-aligned)
+            IconButton(onClick = onLikeClick) {
+                Icon(
+                    imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Like",
+                    tint = if (isLiked) accent else Color.White,
+                    modifier = Modifier.size(28.dp)
                 )
+            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+            // Centered Playback Controls (Previous / Play-Pause / Next)
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onPreviousClick,
+                    enabled = hasPrevious
                 ) {
-                    Text(
-                        text = formatMs(if (isDragging) (dragValue * safeDuration).roundToLong() else positionMs),
-                        color = Color.White.copy(alpha = 0.4f),
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = formatMs(durationMs),
-                        color = Color.White.copy(alpha = 0.4f),
-                        fontSize = 10.sp
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "Previous",
+                        tint = if (hasPrevious) Color.White else Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.size(34.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp)) // Much shorter spacer
+                Spacer(modifier = Modifier.width(20.dp))
 
-                // --- Bottom: Playback Controls ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                // Main Play/Pause (Circular Accent)
+                Surface(
+                    modifier = Modifier
+                        .size(68.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onPlayPauseClick),
+                    color = accent
                 ) {
-                    // Previous
-                    OutlinedIconButton(
-                        onClick = onPreviousClick,
-                        enabled = hasPrevious,
-                        modifier = Modifier.size(44.dp), // Slightly smaller to keep height short
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                        colors = IconButtonDefaults.outlinedIconButtonColors(
-                            contentColor = Color.White,
-                            containerColor = Color.White.copy(alpha = 0.05f)
-                        )
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.SkipPrevious, 
-                            contentDescription = "Previous",
-                            modifier = Modifier.size(18.dp)
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = "Play/Pause",
+                            tint = Color.Black,
+                            modifier = Modifier.size(38.dp)
                         )
                     }
+                }
 
-                    Spacer(modifier = Modifier.width(28.dp))
+                Spacer(modifier = Modifier.width(20.dp))
 
-                    // Play/Pause
-                    Surface(
-                        modifier = Modifier
-                            .size(56.dp) // Slightly smaller
-                            .clip(CircleShape)
-                            .clickable(onClick = onPlayPauseClick)
-                            .shadow(elevation = 8.dp, shape = CircleShape, spotColor = accent),
-                        color = Color.White
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = "Play/Pause",
-                                tint = Color.Black,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(28.dp))
-
-                    // Next
-                    OutlinedIconButton(
-                        onClick = onNextClick,
-                        enabled = hasNext,
-                        modifier = Modifier.size(44.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                        colors = IconButtonDefaults.outlinedIconButtonColors(
-                            contentColor = Color.White,
-                            containerColor = Color.White.copy(alpha = 0.05f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SkipNext, 
-                            contentDescription = "Next",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                IconButton(
+                    onClick = onNextClick,
+                    enabled = hasNext
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Next",
+                        tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.size(34.dp)
+                    )
                 }
             }
+
+            // Right side spacer to keep playback controls centered (since Heart is on the left)
+            Spacer(modifier = Modifier.size(48.dp))
         }
     }
 }

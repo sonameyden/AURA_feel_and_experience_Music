@@ -3,6 +3,7 @@ package com.aura.feature.library
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -92,7 +93,7 @@ fun LibraryScreen(
                     item {
                         LibraryItem(
                             title = "Playlists", 
-                            icon = Icons.Default.List, 
+                            icon = Icons.AutoMirrored.Filled.List, 
                             isLight = isLight,
                             onClick = onPlaylistsClick
                         )

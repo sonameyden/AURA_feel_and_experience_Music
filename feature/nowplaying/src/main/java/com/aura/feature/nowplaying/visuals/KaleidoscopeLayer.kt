@@ -9,11 +9,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,6 +29,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import com.aura.core.model.KaleidoscopeStyle
 import com.aura.core.model.VisualIntensity
 import kotlin.math.PI
@@ -37,7 +40,6 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.coroutines.isActive
-import androidx.compose.runtime.withFrameMillis
 
 /**
  * A layered, mirrored, audio-reactive kaleidoscope/mandala — the Now Playing
@@ -79,7 +81,7 @@ fun KaleidoscopeLayer(
 ) {
     var prevStyle by remember { mutableStateOf(style) }
     var currentStyle by remember { mutableStateOf(style) }
-    var trigger by remember { mutableStateOf(0) }
+    var trigger by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(style) {
         if (style != currentStyle) {
@@ -548,7 +550,7 @@ private fun DrawScope.drawSecondaryGeom(color: Color, radiusPx: Float, sizePx: F
 
 private fun buildColorPalette(primaryHex: String, secondaryHexes: List<String>): List<Color> {
     val parsed = (listOf(primaryHex) + secondaryHexes).mapNotNull {
-        runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
+        runCatching { Color(it.toColorInt()) }.getOrNull()
     }
     return when {
         parsed.isEmpty() -> listOf(Color(0xFFA79AC7), Color(0xFFE9E4DE), Color(0xFFA79AC7))
