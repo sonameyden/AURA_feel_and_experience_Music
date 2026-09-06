@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.toColorInt
 import com.aura.core.model.AtmosphereProfile
 
 /**
@@ -21,10 +22,10 @@ fun ReactiveGradientLayer(
     profile: AtmosphereProfile,
     modifier: Modifier = Modifier
 ) {
-    val primary = runCatching { Color(android.graphics.Color.parseColor(profile.primaryColorHex)) }
+    val primary = runCatching { Color(profile.primaryColorHex.toColorInt()) }
         .getOrDefault(Color.DarkGray)
     val secondary = profile.secondaryColorHexes.firstOrNull()?.let {
-        runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
+        runCatching { Color(it.toColorInt()) }.getOrNull()
     } ?: primary.copy(alpha = 0.4f)
 
     val animatedPrimary by animateColorAsState(

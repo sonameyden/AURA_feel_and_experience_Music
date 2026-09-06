@@ -1,9 +1,7 @@
 package com.aura.feature.library
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,9 +17,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.aura.core.designsystem.components.AlbumArt
 import com.aura.core.designsystem.components.GlassCard
-import com.aura.core.model.Song
 
 @Composable
 fun LibraryScreen(
@@ -92,20 +88,6 @@ fun LibraryScreen(
                             onClick = onLikedSongsClick
                         )
                     }
-                    
-                    if (state.likedSongs.isNotEmpty()) {
-                        items(state.likedSongs.take(3)) { song ->
-                            SongLibraryItem(
-                                song = song, 
-                                isLight = isLight, 
-                                onArtistClick = onArtistClick,
-                                onSongClick = {
-                                    viewModel.onSongClick(song, state.likedSongs)
-                                    onSongClick(song.id)
-                                }
-                            )
-                        }
-                    }
 
                     item {
                         LibraryItem(
@@ -123,20 +105,6 @@ fun LibraryScreen(
                             isLight = isLight,
                             onClick = onHistoryClick
                         )
-                    }
-
-                    if (state.history.isNotEmpty()) {
-                        items(state.history.take(3)) { song ->
-                            SongLibraryItem(
-                                song = song, 
-                                isLight = isLight, 
-                                onArtistClick = onArtistClick,
-                                onSongClick = {
-                                    viewModel.onSongClick(song, state.history)
-                                    onSongClick(song.id)
-                                }
-                            )
-                        }
                     }
 
                     item {
@@ -183,45 +151,6 @@ private fun LibraryItem(title: String, icon: ImageVector, isLight: Boolean, onCl
                     color = if (isLight) Color(0xFF29262D) else Color.White
                 )
             )
-        }
-    }
-}
-
-@Composable
-private fun SongLibraryItem(
-    song: Song, 
-    isLight: Boolean, 
-    onArtistClick: (String) -> Unit,
-    onSongClick: () -> Unit
-) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onSongClick
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AlbumArt(
-                url = song.artworkUrl,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp)
-            )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(
-                    text = song.title,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isLight) Color(0xFF29262D) else Color.White
-                )
-                Text(
-                    text = song.artistName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.clickable { onArtistClick(song.artistId) }
-                )
-            }
         }
     }
 }

@@ -69,6 +69,13 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
+                val song = (state.playbackState as? PlaybackState.Playing)?.song
+                    ?: (state.playbackState as? PlaybackState.Paused)?.song
+                val durationMs = (state.playbackState as? PlaybackState.Playing)?.durationMs
+                    ?: (state.playbackState as? PlaybackState.Paused)?.durationMs
+                    ?: 0L
+                val progress = if (durationMs > 0) state.currentPositionMs.toFloat() / durationMs else 0f
+
                 KaleidoscopeLayer(
                     style = profile.kaleidoscopeStyle,
                     baseEnergy = profile.energy,
@@ -77,6 +84,7 @@ fun NowPlayingScreen(
                     beatPulse = state.beatPulse,
                     primaryColorHex = profile.primaryColorHex,
                     secondaryColorHexes = profile.secondaryColorHexes,
+                    progress = progress,
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -84,14 +92,8 @@ fun NowPlayingScreen(
                     state.currentPositionMs >= line.startTimeMs && 
                     state.currentPositionMs <= line.endTimeMs + 2000L
                 }
-                val song = (state.playbackState as? PlaybackState.Playing)?.song
-                    ?: (state.playbackState as? PlaybackState.Paused)?.song
 
                 if (song != null) {
-                    val durationMs = (state.playbackState as? PlaybackState.Playing)?.durationMs
-                        ?: (state.playbackState as? PlaybackState.Paused)?.durationMs
-                        ?: 0L
-
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -100,7 +102,10 @@ fun NowPlayingScreen(
                     ) {
                         LyricsOverlay(
                             currentLine = currentLine,
-                            isResonant = currentLine?.id in profile.resonantLyricLineIds,
+                            isResonant = currentLine != null && (
+                                currentLine.id in profile.resonantLyricLineIds || 
+                                currentLine.text in profile.resonantLyricLineIds
+                            ),
                             modifier = Modifier.padding(horizontal = 24.dp)
                         )
 

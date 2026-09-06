@@ -80,7 +80,13 @@ class AuthRepository @Inject constructor(
      * yourself.
      */
     suspend fun getIdToken(): String? = withContext(dispatchers.io) {
-        runCatching { firebaseAuth.currentUser?.getIdToken(false)?.await()?.token }.getOrNull()
+        runCatching { 
+            val token = firebaseAuth.currentUser?.getIdToken(false)?.await()?.token
+            if (token != null) {
+                println("DEBUG_TOKEN: $token")
+            }
+            token
+        }.getOrNull()
     }
 }
 

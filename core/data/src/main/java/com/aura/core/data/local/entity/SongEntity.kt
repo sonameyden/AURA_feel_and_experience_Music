@@ -20,12 +20,15 @@ data class SongEntity(
     val streamUrl: String,
     val artworkUrl: String?,
     val genre: String?,
-    val releaseDate: String?
+    val releaseDate: String?,
+    val energy: Float,
+    val valence: Float
 ) {
     fun toDomain(): Song = Song(
         id = id, title = title, artistId = artistId, artistName = artistName,
         albumId = albumId, durationMs = durationMs, streamUrl = streamUrl,
-        artworkUrl = artworkUrl, genre = genre, releaseDate = releaseDate
+        artworkUrl = artworkUrl, genre = genre, releaseDate = releaseDate,
+        energy = energy, valence = valence
     )
 
     companion object {
@@ -33,7 +36,9 @@ data class SongEntity(
             id = song.id, title = song.title, artistId = song.artistId,
             artistName = song.artistName, albumId = song.albumId,
             durationMs = song.durationMs, streamUrl = song.streamUrl,
-            artworkUrl = song.artworkUrl, genre = song.genre, releaseDate = song.releaseDate
+            artworkUrl = song.artworkUrl, genre = song.genre, 
+            releaseDate = song.releaseDate, energy = song.energy, 
+            valence = song.valence
         )
     }
 }

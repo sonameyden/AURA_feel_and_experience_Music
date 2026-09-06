@@ -42,13 +42,15 @@ interface LibraryApi {
     @Headers("Content-Type: application/json")
     suspend fun createPlaylist(@Body body: Map<String, String>): Playlist
 
-    @POST("library/playlists/{playlistId}/songs/{songId}")
+    @POST("library/playlists/{playlistId}/songs")
     @Headers("Content-Type: application/json")
     suspend fun addSongToPlaylist(
         @Path("playlistId") playlistId: String,
-        @Path("songId") songId: String,
-        @Body body: Map<String, String> = emptyMap()
+        @Body body: Map<String, String>
     )
+
+    @DELETE("library/playlists/{playlistId}")
+    suspend fun deletePlaylist(@Path("playlistId") playlistId: String)
 
     @GET("library/worlds")
     suspend fun getSavedWorlds(): List<Any> 

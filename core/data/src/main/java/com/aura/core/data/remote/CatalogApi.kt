@@ -12,6 +12,8 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.http.Body
+import retrofit2.http.DELETE
 
 /**
  * Talks to YOUR backend's catalog endpoints (Section 10 of the project spec) —
@@ -27,8 +29,31 @@ interface CatalogApi {
     @GET("catalog/artists/{id}")
     suspend fun getArtist(@Path("id") id: String): Artist
 
-    @GET("catalog/songs/artist/{artistId}")
+    @GET("catalog/artists")
+    suspend fun getArtists(): List<Artist>
+
+    @GET("catalog/artists/me")
+    suspend fun getMyArtistProfile(): Artist
+
+    @POST("catalog/artists/me")
+    suspend fun createOrUpdateArtistProfile(@Body body: Map<String, String>): Artist
+
+    @Multipart
+    @POST("catalog/artists/me/profile-image")
+    suspend fun uploadProfileImage(@Part file: MultipartBody.Part): Artist
+
+    @GET("catalog/artists/{artistId}/songs")
     suspend fun getSongsByArtist(@Path("artistId") artistId: String): List<Song>
+
+    @DELETE("catalog/songs/{songId}")
+    suspend fun deleteSong(@Path("songId") songId: String)
+
+    @Multipart
+    @POST("catalog/songs/{songId}/artwork")
+    suspend fun updateSongArtwork(
+        @Path("songId") songId: String,
+        @Part artwork: MultipartBody.Part
+    ): Song
 
     @GET("catalog/albums/{id}")
     suspend fun getAlbum(@Path("id") id: String): Album
@@ -46,6 +71,7 @@ interface CatalogApi {
     @POST("catalog/songs/upload")
     suspend fun uploadSong(
         @Part file: MultipartBody.Part,
+        @Part artwork: MultipartBody.Part?,
         @Part("title") title: RequestBody,
         @Part("artistName") artistName: RequestBody,
         @Part("genre") genre: RequestBody,

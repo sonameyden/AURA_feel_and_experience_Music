@@ -17,7 +17,7 @@ interface LyricsApi {
 
 @JsonClass(generateAdapter = true)
 data class LyricsResponse(
-    @Json(name = "song_id") val songId: String,
+    @Json(name = "songId") val songId: String,
     @Json(name = "lines") val lines: List<LyricLine> = emptyList()
 )
 
@@ -25,6 +25,6 @@ data class LyricsResponse(
 data class LyricLine(
     @Json(name = "id") val id: String,
     @Json(name = "text") val text: String = "",
-    @Json(name = "start_time_ms") val startTimeMs: Long = 0,
-    @Json(name = "end_time_ms") val endTimeMs: Long = 0
+    @Json(name = "startTimeMs") val startTimeMs: Long = 0,
+    @Json(name = "endTimeMs") val endTimeMs: Long = 0
 )

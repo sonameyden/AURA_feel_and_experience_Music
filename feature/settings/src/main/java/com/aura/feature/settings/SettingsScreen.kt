@@ -1,7 +1,9 @@
 package com.aura.feature.settings
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -17,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.aura.core.designsystem.components.GlassCard
+import com.aura.feature.artist.ArtistViewModel
+import com.aura.feature.artist.UploadState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,12 +30,15 @@ fun SettingsScreen(
     onArtistProfileClick: (String) -> Unit,
     isDarkTheme: Boolean,
     onThemeChange: (Boolean) -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    artistViewModel: ArtistViewModel = hiltViewModel()
 ) {
     var reducedMotion by remember { mutableStateOf(false) }
     var catVisible by remember { mutableStateOf(true) }
-    var isArtist by remember { mutableStateOf(false) }
     val isLight = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    
+    var showBecomeArtistDialog by remember { mutableStateOf(false) }
+    val artistState by artistViewModel.uploadState.collectAsState()
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -61,7 +68,8 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(32.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -96,51 +104,36 @@ fun SettingsScreen(
 
             // --- Section 2: Artist Features ---
             SettingsSection(title = "For Creators", icon = Icons.Default.Stars, isLight = isLight) {
-                if (isArtist) {
-                    GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onArtistProfileClick("current_user") }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(20.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Artist Dashboard", 
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isLight) Color(0xFF29262D) else Color.White
-                            )
-                            Icon(
-                                Icons.Default.ChevronRight, 
-                                contentDescription = null,
-                                tint = if (isLight) Color(0xFFA79AC7) else Color.White.copy(alpha = 0.5f)
-                            )
-                        }
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { 
+                        onArtistProfileClick("me")
                     }
-                } else {
-                    GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { isArtist = true }
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            text = "Artist Dashboard", 
+                            fontWeight = FontWeight.Bold,
+                            color = if (isLight) Color(0xFF29262D) else Color.White
+                        )
+                        Text(
+                            text = "Manage your music and profile.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+                
+                if (artistState !is UploadState.Success) {
+                    TextButton(
+                        onClick = { showBecomeArtistDialog = true },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
-                            Text(
-                                text = "Become an Artist", 
-                                fontWeight = FontWeight.Bold,
-                                color = if (isLight) Color(0xFF29262D) else Color.White
-                            )
-                            Text(
-                                text = "Claim your profile and start uploading music.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.6f),
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
+                        Text("Not an artist? Become one now")
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
 
             // --- Section 3: Account ---
             Button(
@@ -161,8 +154,56 @@ fun SettingsScreen(
                 Text("Log out", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            // Extra padding for mini-player
+            Spacer(modifier = Modifier.height(130.dp))
         }
+    }
+
+    if (showBecomeArtistDialog) {
+        var artistName by remember { mutableStateOf("") }
+        var artistBio by remember { mutableStateOf("") }
+        
+        AlertDialog(
+            onDismissRequest = { showBecomeArtistDialog = false },
+            title = { Text("Complete Your Artist Profile") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = artistName,
+                        onValueChange = { artistName = it },
+                        label = { Text("Artist Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = artistBio,
+                        onValueChange = { artistBio = it },
+                        label = { Text("Bio (Optional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        artistViewModel.becomeArtist(artistName, artistBio)
+                        showBecomeArtistDialog = false
+                    },
+                    enabled = artistName.isNotBlank()
+                ) {
+                    if (artistState is UploadState.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    } else {
+                        Text("Finish")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBecomeArtistDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

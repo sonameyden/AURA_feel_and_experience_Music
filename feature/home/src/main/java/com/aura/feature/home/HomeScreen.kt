@@ -25,14 +25,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.aura.core.designsystem.components.AlbumArt
-import com.aura.core.designsystem.components.AuraBackground
 import com.aura.core.designsystem.components.GlassCard
 import com.aura.core.designsystem.components.PlayingGlowRing
+import com.aura.core.model.Artist
 import com.aura.core.model.Song
 import com.aura.feature.library.AddToPlaylistDialog
 import com.aura.feature.library.LibraryUiState
@@ -55,9 +56,8 @@ fun HomeScreen(
     
     var songToAddToPlaylist by remember { mutableStateOf<Song?>(null) }
 
-    AuraBackground {
-        Scaffold(
-            topBar = {
+    Scaffold(
+        topBar = {
                 TopAppBar(
                     title = {
                         Text(
@@ -147,6 +147,22 @@ fun HomeScreen(
                                 )
                             }
                         }
+
+                        if (state.recommendedArtists.isNotEmpty()) {
+                            SectionHeader(title = "Artists for you", isLight = isLight)
+                            LazyRow(
+                                contentPadding = PaddingValues(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
+                                items(state.recommendedArtists) { artist ->
+                                    ArtistCircleCard(
+                                        artist = artist,
+                                        isLight = isLight,
+                                        onClick = { onArtistClick(artist.id) }
+                                    )
+                                }
+                            }
+                        }
                         
                         if (state.recommendations.isNotEmpty()) {
                             SectionHeader(title = "Recommended For You", isLight = isLight)
@@ -170,7 +186,7 @@ fun HomeScreen(
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(110.dp)) // Natural end of content
+                        Spacer(modifier = Modifier.height(130.dp)) // Natural end of content, higher for miniplayer
                     }
 
                     is HomeUiState.Loading -> {
@@ -200,7 +216,6 @@ fun HomeScreen(
                 onDismiss = { songToAddToPlaylist = null }
             )
         }
-    }
 }
 
 @Composable
@@ -343,6 +358,41 @@ private fun TrendingSongCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ArtistCircleCard(
+    artist: Artist,
+    isLight: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(80.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AlbumArt(
+            url = artist.imageUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape),
+            shape = CircleShape
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = artist.name,
+            style = TextStyle(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isLight) Color(0xFF302D33) else Color.White
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

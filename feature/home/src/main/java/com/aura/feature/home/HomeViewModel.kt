@@ -1,13 +1,16 @@
 package com.aura.feature.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aura.core.audio.AuraPlayer
 import com.aura.core.audio.PlaybackState
 import com.aura.core.common.util.AppResult
+import com.aura.core.data.repository.ArtistRepository
 import com.aura.core.data.repository.SongRepository
 import com.aura.core.model.Song
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +23,7 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val songRepository: SongRepository,
+    private val artistRepository: ArtistRepository,
     private val player: AuraPlayer
 ) : ViewModel() {
 
@@ -41,27 +45,29 @@ class HomeViewModel @Inject constructor(
 
     private fun load() {
         viewModelScope.launch {
-            val trendingResult = songRepository.getTrending()
-            val recommendationsResult = songRepository.getRecommendations()
+            val trendingDeferred = async { songRepository.getTrending() }
+            val recommendationsDeferred = async { songRepository.getRecommendations() }
+            val artistsDeferred = async { artistRepository.getArtists() }
+
+            val trendingResult = trendingDeferred.await()
+            val recommendationsResult = recommendationsDeferred.await()
+            val artistsResult = artistsDeferred.await()
 
             val trending = (trendingResult as? AppResult.Success)?.data ?: emptyList()
             val recommendations = (recommendationsResult as? AppResult.Success)?.data ?: emptyList()
+            val artists = (artistsResult as? AppResult.Success)?.data ?: emptyList()
+
+            Log.d("HomeViewModel", "Loaded ${trending.size} trending, ${artists.size} artists, ${recommendations.size} recommendations")
 
             _uiState.value = HomeUiState.Ready(
-                recentlyPlayed = emptyList(), // TODO: wire to local listening-history table
+                recentlyPlayed = emptyList(),
                 trending = trending,
+                recommendedArtists = artists,
                 recommendations = recommendations
             )
         }
     }
 
-    /**
-     * Starts playback immediately, on the first tap, using the currently
-     * displayed Trending row as the playback queue — so Next/Previous on
-     * Now Playing walk through the same list the user was browsing.
-     * Navigation to Now Playing is handled separately by the caller; this
-     * function alone is what makes tapping a song play it right away.
-     */
     fun onSongClick(song: Song) {
         val state = _uiState.value
         val queue = (state as? HomeUiState.Ready)?.trending?.takeIf { it.isNotEmpty() } ?: listOf(song)

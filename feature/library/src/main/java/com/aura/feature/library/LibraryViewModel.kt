@@ -49,7 +49,6 @@ class LibraryViewModel @Inject constructor(
                 _uiState.value = LibraryUiState.Loading
             }
             
-            // Call all three APIs in parallel
             val likedDeferred = async { libraryRepository.getLikedSongs() }
             val historyDeferred = async { libraryRepository.getHistory() }
             val playlistsDeferred = async { playlistRepository.getUserPlaylists() }
@@ -58,14 +57,12 @@ class LibraryViewModel @Inject constructor(
             val historyResult = historyDeferred.await()
             val playlistsResult = playlistsDeferred.await()
             
-            // Extract data with fallbacks so one failure doesn't block the others
             val liked = (likedResult as? AppResult.Success)?.data ?: emptyList()
             val history = (historyResult as? AppResult.Success)?.data ?: emptyList()
             val playlists = (playlistsResult as? AppResult.Success)?.data ?: emptyList()
 
-            // If ALL failed, then show an error. Otherwise, show what we have.
             if (likedResult is AppResult.Error && historyResult is AppResult.Error && playlistsResult is AppResult.Error) {
-                _uiState.value = LibraryUiState.Error("Sync failed. Please check your connection.")
+                _uiState.value = LibraryUiState.Error("Sync failed. Check connection.")
             } else {
                 _uiState.value = LibraryUiState.Success(
                     likedSongs = liked,
@@ -74,9 +71,10 @@ class LibraryViewModel @Inject constructor(
                     isRefreshing = false
                 )
                 
-                // Log non-critical errors for debugging
-                if (historyResult is AppResult.Error) println("History Sync Error: ${historyResult.error}")
-                if (playlistsResult is AppResult.Error) println("Playlist Sync Error: ${playlistsResult.error}")
+                // Detailed logging for development
+                if (playlistsResult is AppResult.Error) {
+                    println("Playlist Sync Detail: ${playlistsResult.error}")
+                }
             }
         }
     }
@@ -102,9 +100,25 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    fun deletePlaylist(playlistId: String) {
+        viewModelScope.launch {
+            val result = playlistRepository.deletePlaylist(playlistId)
+            if (result is AppResult.Success) {
+                load()
+            }
+        }
+    }
+
     fun onSongClick(song: Song, queue: List<Song>) {
         val startIndex = queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
         player.playQueue(queue, startIndex)
+    }
+
+    private fun AppError.toMessage(): String = when (this) {
+        AppError.Network -> "Network issue."
+        AppError.Unauthorized -> "Auth failed."
+        is AppError.Unknown -> message ?: "Data error."
+        else -> "Error."
     }
 }
 

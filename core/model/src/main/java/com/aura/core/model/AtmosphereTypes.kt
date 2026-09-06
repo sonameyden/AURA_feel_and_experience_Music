@@ -57,6 +57,6 @@ enum class SongSection {
 @JsonClass(generateAdapter = true)
 data class SongSectionProfile(
     @Json(name = "section") val section: SongSection,
-    @Json(name = "start_time_ms") val startTimeMs: Long,
-    @Json(name = "intensity_multiplier") val intensityMultiplier: Float
+    @Json(name = "startTimeMs") val startTimeMs: Long,
+    @Json(name = "intensityMultiplier") val intensityMultiplier: Float
 )

@@ -20,4 +20,7 @@ interface PlaylistDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(playlists: List<PlaylistEntity>)
+
+    @Query("DELETE FROM playlists WHERE id = :playlistId")
+    suspend fun deleteById(playlistId: String)
 }

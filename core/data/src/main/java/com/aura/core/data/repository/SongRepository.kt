@@ -1,5 +1,6 @@
 package com.aura.core.data.repository
 
+import android.util.Log
 import com.aura.core.common.util.AppDispatchers
 import com.aura.core.common.util.AppError
 import com.aura.core.common.util.AppResult
@@ -16,18 +17,14 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Single source of truth for song/catalog data. UI/ViewModels never call
- * CatalogApi or SongDao directly — only this repository.
- *
- * Pattern: Room is read-through cache; network is source of truth; every
- * exception is converted into AppError at this boundary (never leaks raw
- * exceptions up to the ViewModel), per the best-practices doc.
+ * Single source of truth for song/catalog data.
  */
 @Singleton
 class SongRepository @Inject constructor(
@@ -66,19 +63,13 @@ class SongRepository @Inject constructor(
 
     suspend fun getTrending(): AppResult<List<Song>> = withContext(dispatchers.io) {
         runCatching {
-            // 1. Try to return cache immediately
-            val cached = catalogCacheDao.getBySection("trending")
-
-            // 2. Refresh from network
             val remote = catalogApi.getTrending()
             songDao.upsertAll(remote.map { SongEntity.fromDomain(it) })
             catalogCacheDao.upsert(CatalogCacheEntity("trending", remote.map { it.id }))
-
             remote
         }.fold(
             onSuccess = { AppResult.Success(it) },
             onFailure = {
-                // If network fails, try to fallback to cache if we haven't already returned it
                 val fallback = catalogCacheDao.getBySection("trending")?.songIds
                     ?.mapNotNull { songDao.getById(it)?.toDomain() }
                 if (!fallback.isNullOrEmpty()) AppResult.Success(fallback)
@@ -111,7 +102,8 @@ class SongRepository @Inject constructor(
         artistName: String,
         genre: String,
         durationMs: Long,
-        file: File
+        audioFile: File,
+        artworkFile: File?
     ): AppResult<Song> = withContext(dispatchers.io) {
         runCatching {
             val titlePart = title.toRequestBody("text/plain".toMediaType())
@@ -119,12 +111,53 @@ class SongRepository @Inject constructor(
             val genrePart = genre.toRequestBody("text/plain".toMediaType())
             val durationPart = durationMs.toString().toRequestBody("text/plain".toMediaType())
             
-            val filePart = MultipartBody.Part.createFormData(
-                "file", // The backend parameter name is 'file' based on the requested signature
-                file.name,
-                file.asRequestBody("audio/*".toMediaType())
+            val audioPart = MultipartBody.Part.createFormData(
+                "file",
+                audioFile.name,
+                audioFile.asRequestBody("audio/*".toMediaType())
             )
-            val remote = catalogApi.uploadSong(filePart, titlePart, artistPart, genrePart, durationPart)
+
+            val artworkPart = artworkFile?.let {
+                MultipartBody.Part.createFormData(
+                    "artwork",
+                    it.name,
+                    it.asRequestBody("image/*".toMediaType())
+                )
+            }
+
+            val remote = catalogApi.uploadSong(audioPart, artworkPart, titlePart, artistPart, genrePart, durationPart)
+            songDao.upsert(SongEntity.fromDomain(remote))
+            remote
+        }.fold(
+            onSuccess = { AppResult.Success(it) },
+            onFailure = { AppResult.Error(it.toAppError()) }
+        )
+    }
+
+    suspend fun deleteSong(songId: String): AppResult<Unit> = withContext(dispatchers.io) {
+        runCatching {
+            Log.d("SongRepository", "Calling deleteSong API for id: $songId")
+            catalogApi.deleteSong(songId)
+            Log.d("SongRepository", "API delete success, removing from local DAO")
+            songDao.deleteById(songId)
+        }.fold(
+            onSuccess = { AppResult.Success(Unit) },
+            onFailure = { 
+                Log.e("SongRepository", "Delete failed: ${it.message}")
+                it.printStackTrace()
+                AppResult.Error(it.toAppError()) 
+            }
+        )
+    }
+
+    suspend fun updateSongArtwork(songId: String, artworkFile: File): AppResult<Song> = withContext(dispatchers.io) {
+        runCatching {
+            val artworkPart = MultipartBody.Part.createFormData(
+                "artwork",
+                artworkFile.name,
+                artworkFile.asRequestBody("image/*".toMediaType())
+            )
+            val remote = catalogApi.updateSongArtwork(songId, artworkPart)
             songDao.upsert(SongEntity.fromDomain(remote))
             remote
         }.fold(
@@ -134,8 +167,11 @@ class SongRepository @Inject constructor(
     }
 }
 
-/** Shared exception -> AppError mapping, used across every repository in this module. */
 internal fun Throwable.toAppError(): AppError = when (this) {
     is IOException -> AppError.Network
+    is HttpException -> {
+        val msg = response()?.errorBody()?.string() ?: message()
+        AppError.Unknown("HTTP ${code()}: $msg")
+    }
     else -> AppError.Unknown(message)
 }

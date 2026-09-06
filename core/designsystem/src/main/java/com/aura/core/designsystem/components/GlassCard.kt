@@ -12,6 +12,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
+    cornerRadius: Dp = 20.dp,
     accentColor: Color? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
@@ -33,11 +35,11 @@ fun GlassCard(
         accentColor?.let { Color.White.copy(alpha = 0.8f).compositeOver(it) } 
             ?: Color.White.copy(alpha = 0.65f)
     } else {
-        // Dark Mode: Muted translucent violet
-        accentColor?.let { base.copy(alpha = 0.92f).compositeOver(it) } ?: base
+        // Dark Mode: Muted translucent violet - reduced alpha for better visibility of background art
+        accentColor?.let { base.copy(alpha = 0.7f).compositeOver(it) } ?: base.copy(alpha = 0.55f)
     }
 
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(cornerRadius)
     val shadowColor = if (isLight) Color(0xFF29262D).copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.2f)
 
     Box(
@@ -56,6 +58,3 @@ fun GlassCard(
         content()
     }
 }
-
-// Helper removed as we use graphics.compositeOver now
-

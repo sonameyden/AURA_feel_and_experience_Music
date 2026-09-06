@@ -5,20 +5,20 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class AtmosphereProfile(
-    @Json(name = "song_id") val songId: String,
+    @Json(name = "songId") val songId: String,
     @Json(name = "emotion") val emotion: String = "neutral",
     @Json(name = "energy") val energy: Float = 0.5f,
     @Json(name = "valence") val valence: Float = 0.5f,
     @Json(name = "environment") val environment: EnvironmentType = EnvironmentType.Nature,
-    @Json(name = "primary_color_hex") val primaryColorHex: String = "#A79AC7",
-    @Json(name = "secondary_color_hexes") val secondaryColorHexes: List<String> = emptyList(),
-    @Json(name = "lighting_style") val lightingStyle: LightingStyle = LightingStyle.Soft,
-    @Json(name = "particle_style") val particleStyle: ParticleStyle = ParticleStyle.None,
-    @Json(name = "kaleidoscope_style") val kaleidoscopeStyle: KaleidoscopeStyle = KaleidoscopeStyle.SoftOrganic,
-    @Json(name = "cat_behavior") val catBehavior: CatBehaviorState = CatBehaviorState.Idle,
-    @Json(name = "transition_style") val transitionStyle: TransitionStyle = TransitionStyle.Gentle,
-    @Json(name = "resonant_lyric_line_ids") val resonantLyricLineIds: List<String> = emptyList(),
-    @Json(name = "section_profiles") val sectionProfiles: List<SongSectionProfile> = emptyList()
+    @Json(name = "primaryColorHex") val primaryColorHex: String = "#A79AC7",
+    @Json(name = "secondaryColorHexes") val secondaryColorHexes: List<String> = emptyList(),
+    @Json(name = "lightingStyle") val lightingStyle: LightingStyle = LightingStyle.Soft,
+    @Json(name = "particleStyle") val particleStyle: ParticleStyle = ParticleStyle.None,
+    @Json(name = "kaleidoscopeStyle") val kaleidoscopeStyle: KaleidoscopeStyle = KaleidoscopeStyle.SoftOrganic,
+    @Json(name = "catBehavior") val catBehavior: CatBehaviorState = CatBehaviorState.Idle,
+    @Json(name = "transitionStyle") val transitionStyle: TransitionStyle = TransitionStyle.Gentle,
+    @Json(name = "resonantLyricLineIds") val resonantLyricLineIds: List<String> = emptyList(),
+    @Json(name = "sectionProfiles") val sectionProfiles: List<SongSectionProfile> = emptyList()
 ) {
     companion object {
         fun loadingPlaceholder(songId: String): AtmosphereProfile = AtmosphereProfile(

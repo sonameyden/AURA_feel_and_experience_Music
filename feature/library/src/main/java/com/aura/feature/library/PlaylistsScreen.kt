@@ -8,6 +8,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ fun PlaylistsScreen(
     }
 
     var showCreateDialog by remember { mutableStateOf(false) }
+    var playlistToDelete by remember { mutableStateOf<Playlist?>(null) }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -101,7 +103,8 @@ fun PlaylistsScreen(
                                 PlaylistItem(
                                     playlist = playlist,
                                     isLight = isLight,
-                                    onClick = { onPlaylistClick(playlist.id) }
+                                    onClick = { onPlaylistClick(playlist.id) },
+                                    onDeleteClick = { playlistToDelete = playlist }
                                 )
                             }
                         }
@@ -157,13 +160,38 @@ fun PlaylistsScreen(
             }
         )
     }
+
+    playlistToDelete?.let { playlist ->
+        AlertDialog(
+            onDismissRequest = { playlistToDelete = null },
+            title = { Text("Delete Playlist") },
+            text = { Text("Are you sure you want to delete \"${playlist.title}\"?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deletePlaylist(playlist.id)
+                        playlistToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { playlistToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 private fun PlaylistItem(
     playlist: Playlist,
     isLight: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -192,6 +220,14 @@ private fun PlaylistItem(
                     text = "${playlist.songIds.size} songs",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isLight) Color(0xFF77717A) else Color.White.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onDeleteClick) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = if (isLight) Color(0xFFD32F2F) else MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
             Icon(

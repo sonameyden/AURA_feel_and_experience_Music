@@ -61,7 +61,17 @@ class PlaylistRepository @Inject constructor(
 
     suspend fun addSongToPlaylist(playlistId: String, songId: String): AppResult<Unit> = withContext(dispatchers.io) {
         runCatching {
-            libraryApi.addSongToPlaylist(playlistId, songId)
+            libraryApi.addSongToPlaylist(playlistId, mapOf("songId" to songId))
+        }.fold(
+            onSuccess = { AppResult.Success(Unit) },
+            onFailure = { AppResult.Error(it.toAppError()) }
+        )
+    }
+
+    suspend fun deletePlaylist(playlistId: String): AppResult<Unit> = withContext(dispatchers.io) {
+        runCatching {
+            libraryApi.deletePlaylist(playlistId)
+            playlistDao.deleteById(playlistId)
         }.fold(
             onSuccess = { AppResult.Success(Unit) },
             onFailure = { AppResult.Error(it.toAppError()) }

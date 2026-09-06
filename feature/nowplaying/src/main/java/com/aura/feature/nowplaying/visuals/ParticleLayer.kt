@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.toColorInt
 import com.aura.core.model.ParticleStyle
 import kotlin.random.Random
 
@@ -41,7 +42,7 @@ fun ParticleLayer(
         mutableStateOf(List(particleCount) { randomParticle() })
     }
 
-    val tint = runCatching { Color(android.graphics.Color.parseColor(tintHex)) }.getOrDefault(Color.White)
+    val tint = runCatching { Color(tintHex.toColorInt()) }.getOrDefault(Color.White)
 
     Canvas(modifier = modifier.fillMaxSize()) {
         particles = particles.map { p ->

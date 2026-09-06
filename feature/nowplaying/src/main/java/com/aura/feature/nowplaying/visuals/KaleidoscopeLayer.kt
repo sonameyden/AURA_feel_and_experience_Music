@@ -9,63 +9,74 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.unit.dp
 import com.aura.core.model.KaleidoscopeStyle
 import com.aura.core.model.VisualIntensity
-import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.coroutines.isActive
 import androidx.compose.runtime.withFrameMillis
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
 
 /**
- * A layered, mirrored, audio-reactive kaleidoscope/mandala — the signature
- * visual element of the Now Playing screen.
+ * A layered, mirrored, audio-reactive kaleidoscope/mandala — the Now Playing
+ * screen's signature visual. v3 adds three things on top of the previous
+ * (bug-fixed) version, all driven by the interactive preview you approved:
  *
- * MORPHING & REACTIVITY:
- * 1. Style Morphing: When the KaleidoscopeStyle changes (song change), we
- *    animate a `transitionProgress` factor and cross-fade between the old
- *    and new motifs/symmetry counts.
- * 2. Color Morphing: Palette colors animate smoothly to their new values.
- * 3. Responsive Energy: We split energy into `baseEnergy` (morphed from
- *    profile) and `liveAmplitude` (raw from AudioAnalyzer). Only the base
- *    morphes; the live part is instant for maximum "feeling" of the music.
- * 4. Beat Bloom: Onsets trigger a bloom that eases out, layered on top of
- *    the breathing animation.
+ * 1. PER-RING MOTIF VARIETY — each style now cycles through a short sequence
+ *    of motif shapes by ring depth (e.g. Dream: petal -> flower -> shard)
+ *    instead of repeating one shape at shrinking sizes. This is what turns
+ *    "pretty" into "intricate".
+ * 2. SONG-SECTION AWARENESS — `progress` (0f.1f, song position) drives a
+ *    complexity curve: sparse on intro/outro, builds through verse and
+ *    pre-chorus, peaks at chorus, dips on bridge. Ring count and energy are
+ *    both modulated by this curve, on top of (not instead of) live audio.
+ * 3. PARTICLE-CORE LIGHT + SPECULAR SPARKLES — particles brighten as they
+ *    pass near the glowing core, and rare small cross-shaped highlights spawn
+ *    along the outer ring's motif tips and fade out, mimicking light
+ *    catching an edge.
+ *
+ * All fixes from the previous pass are preserved: rotation is accumulated
+ * per-frame (not `elapsedTime * speed`), raw amplitude is smoothed locally
+ * with fast-attack/slow-release before touching anything visual, breathing
+ * is a genuinely subtle few-percent effect, and the vignette extends past
+ * the screen diagonal with a low peak alpha so it never reads as a circle.
  */
 @Composable
 fun KaleidoscopeLayer(
     style: KaleidoscopeStyle,
     baseEnergy: Float,          // AtmosphereProfile.energy — morphs on song change
-    liveAmplitude: Float,       // AudioAnalyzer.amplitude — real-time, no smoothing
+    liveAmplitude: Float,       // AudioAnalyzer.amplitude — raw at the source, smoothed here
     valence: Float,             // AtmosphereProfile.valence — morphs on song change
     beatPulse: Boolean,
     primaryColorHex: String,
     secondaryColorHexes: List<String>,
     modifier: Modifier = Modifier,
+    progress: Float = 0f,       // 0f..1f — song position, drives section-aware complexity
     reducedMotion: Boolean = false,
     visualIntensity: VisualIntensity = VisualIntensity.Medium
 ) {
-    // Morphing: cross-fade between styles when they change
     var prevStyle by remember { mutableStateOf(style) }
     var currentStyle by remember { mutableStateOf(style) }
     var trigger by remember { mutableStateOf(0) }
@@ -85,7 +96,6 @@ fun KaleidoscopeLayer(
     )
     val morphFactor = (transitionProgress - trigger + 1).coerceIn(0f, 1f)
 
-    // 2. Animate morphing properties (AtmosphereProfile values)
     val animatedBaseEnergy by animateFloatAsState(
         targetValue = baseEnergy,
         animationSpec = tween(durationMillis = 1500),
@@ -97,7 +107,6 @@ fun KaleidoscopeLayer(
         label = "valence"
     )
 
-    // 3. Color Morphing
     val baseColors = remember(primaryColorHex, secondaryColorHexes) {
         buildColorPalette(primaryColorHex, secondaryColorHexes)
     }
@@ -122,37 +131,63 @@ fun KaleidoscopeLayer(
         }
     }
 
+    val sparkles = remember { mutableStateListOf<Sparkle>() }
+
     var timeMs by remember { mutableFloatStateOf(0f) }
     var bloom by remember { mutableFloatStateOf(0f) }
     var bloomTarget by remember { mutableFloatStateOf(0f) }
+    var outerAngle by remember { mutableFloatStateOf(0f) }
+    var midAngle by remember { mutableFloatStateOf(0f) }
+    var smoothedAmplitude by remember { mutableFloatStateOf(0f) }
 
     val currentBeatPulse by rememberUpdatedState(beatPulse)
     val currentReducedMotion by rememberUpdatedState(reducedMotion)
+    val currentLiveAmplitude by rememberUpdatedState(liveAmplitude)
+    val currentBaseEnergy by rememberUpdatedState(animatedBaseEnergy)
+    val currentProgress by rememberUpdatedState(progress)
 
     LaunchedEffect(Unit) {
         var lastFrame = -1L
         while (isActive) {
             withFrameMillis { frameTimeMs ->
-                if (lastFrame >= 0) {
-                    timeMs += (frameTimeMs - lastFrame).toFloat()
-                }
+                val dtMs = if (lastFrame >= 0) (frameTimeMs - lastFrame).toFloat() else 0f
                 lastFrame = frameTimeMs
+                timeMs += dtMs
+
+                val attackRate = 0.5f
+                val releaseRate = 0.08f
+                val rate = if (currentLiveAmplitude > smoothedAmplitude) attackRate else releaseRate
+                smoothedAmplitude += (currentLiveAmplitude - smoothedAmplitude) * rate
 
                 if (currentBeatPulse) bloomTarget = 1f
-                val rise = 0.5f
-                val fall = 0.04f
-                bloom += (bloomTarget - bloom) * (if (bloomTarget > bloom) rise else fall)
+                bloom += (bloomTarget - bloom) * (if (bloomTarget > bloom) 0.3f else 0.05f)
                 bloomTarget *= if (currentReducedMotion) 0.85f else 0.96f
+
+                val motionMul = if (currentReducedMotion) 0.12f else 1f
+                val sectionMul = sectionComplexity(currentProgress)
+                val totalEnergyForMotion = (currentBaseEnergy + smoothedAmplitude).coerceIn(0f, 1.2f)
+                val effectiveEnergyForMotion = (totalEnergyForMotion * (0.5f + sectionMul * 0.6f)).coerceIn(0f, 1.2f)
+                val outerSpeed = (0.00006f + effectiveEnergyForMotion * 0.0012f) * motionMul
+                val midSpeed = (0.0001f + effectiveEnergyForMotion * 0.0018f) * motionMul
+                outerAngle += dtMs * outerSpeed
+                midAngle -= dtMs * midSpeed
+
+                for (i in sparkles.indices.reversed()) {
+                    sparkles[i].life -= 0.03f
+                    if (sparkles[i].life <= 0f) sparkles.removeAt(i)
+                }
             }
         }
     }
 
     val bloomEased = easeOutCubic(bloom.coerceIn(0f, 1f))
     val motionMul = if (reducedMotion) 0.12f else 1f
-    
-    // Final energy is the morphed base + raw live amplitude
-    val totalEnergy = (animatedBaseEnergy + liveAmplitude).coerceIn(0f, 1.2f)
-    
+    val sectionMul = sectionComplexity(progress)
+    val totalEnergy = (animatedBaseEnergy + smoothedAmplitude).coerceIn(0f, 1.2f)
+    val effectiveEnergy = (totalEnergy * (0.5f + sectionMul * 0.6f)).coerceIn(0f, 1.2f)
+
+    val activeRings = (1 + sectionMul * (tier.rings - 1)).roundToInt().coerceIn(1, tier.rings)
+
     val warm = animatedValence > 0.5f
     val warmAmt = abs(animatedValence - 0.5f) * 2f
     val auraColor = if (warm) Color(0xFFF2C48A) else Color(0xFF7A8CD8)
@@ -161,17 +196,15 @@ fun KaleidoscopeLayer(
         val cx = size.width / 2f
         val cy = size.height / 2f - 10.dp.toPx()
 
-        // Breath and rotation respond to live energy for "feeling the music"
-        val breathe = 1f + sin(timeMs * 0.0011f) * 0.02f + bloomEased * 0.35f + liveAmplitude * 0.25f
-        val outerRot = timeMs * (0.00006f + totalEnergy * 0.0008f) * motionMul
-        val midRot = -timeMs * (0.0001f + totalEnergy * 0.0012f) * motionMul
+        val breathe = 1f + sin(timeMs * 0.0011f) * 0.02f + bloomEased * 0.06f + smoothedAmplitude * 0.05f
+        val outerRot = outerAngle
+        val midRot = midAngle
 
-        // Layer 1: background aura
-        val auraRadiusPx = (110f + totalEnergy * 110f + bloomEased * 100f).dp.toPx()
+        val auraRadiusPx = (100f + effectiveEnergy * 70f + bloomEased * 30f).dp.toPx()
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    auraColor.copy(alpha = 0.14f + warmAmt * 0.08f + bloomEased * 0.3f + liveAmplitude * 0.25f),
+                    auraColor.copy(alpha = 0.14f + warmAmt * 0.08f + bloomEased * 0.12f),
                     auraColor.copy(alpha = 0f)
                 ),
                 center = Offset(cx, cy),
@@ -184,38 +217,40 @@ fun KaleidoscopeLayer(
         translate(left = cx, top = cy) {
             scale(scale = breathe, pivot = Offset.Zero) {
 
-                // Layer 2: primary organic motifs
-                // Morphing: Draw BOTH styles if we're transitioning
                 if (morphFactor < 1f) {
-                    drawMandala(prevStyle, colors, tier, outerRot, totalEnergy, bloomEased, 1f - morphFactor)
+                    drawMandala(
+                        prevStyle, colors, activeRings, outerRot, effectiveEnergy,
+                        bloomEased, 1f - morphFactor, sparkles
+                    )
                 }
-                drawMandala(currentStyle, colors, tier, outerRot, totalEnergy, bloomEased, morphFactor)
+                drawMandala(
+                    currentStyle, colors, activeRings, outerRot, effectiveEnergy,
+                    bloomEased, morphFactor, sparkles
+                )
 
-                // Layer 3: secondary geometric accents (morphed symmetry)
                 rotate(degrees = degrees(midRot), pivot = Offset.Zero) {
                     val geomSymmetry = if (morphFactor < 0.5f) prevStyle.symmetryCount() else currentStyle.symmetryCount()
-                    val geomCount = geomSymmetry * (if (tier.rings > 2) 2 else 1)
+                    val geomCount = geomSymmetry * (if (activeRings > 2) 2 else 1)
                     for (s in 0 until geomCount) {
                         rotate(degrees = 360f / geomCount * s, pivot = Offset.Zero) {
                             val color = colors[(s + 1) % colors.size]
                             drawSecondaryGeom(
                                 color = color,
-                                radiusPx = (52f + totalEnergy * 30f).dp.toPx(),
-                                sizePx = (6f + totalEnergy * 4f).dp.toPx(),
-                                alpha = (0.28f + tier.glow * 0.12f) * morphFactor
+                                radiusPx = (48f + effectiveEnergy * 26f).dp.toPx(),
+                                sizePx = (6f + effectiveEnergy * 3f).dp.toPx(),
+                                alpha = (0.26f + sectionMul * 0.14f) * morphFactor
                             )
                         }
                     }
                 }
 
-                // Layer 4: Glowing core
-                val coreRadiusPx = (15f + totalEnergy * 20f + bloomEased * 25f).dp.toPx()
+                val coreRadiusPx = (14f + effectiveEnergy * 10f + bloomEased * 10f).dp.toPx()
                 val coreColor = colors[0]
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            coreColor.copy(alpha = 0.8f + bloomEased * 0.4f + liveAmplitude * 0.3f),
-                            colors.getOrElse(1) { coreColor }.copy(alpha = 0.3f),
+                            coreColor.copy(alpha = 0.85f + bloomEased * 0.15f),
+                            colors.getOrElse(1) { coreColor }.copy(alpha = 0.35f),
                             coreColor.copy(alpha = 0f)
                         ),
                         center = Offset.Zero,
@@ -225,72 +260,110 @@ fun KaleidoscopeLayer(
                     center = Offset.Zero
                 )
 
-                // Layer 5: particles, reactive to beat and amplitude
                 particles.forEachIndexed { i, p ->
-                    val outward = bloomEased * 60f + liveAmplitude * 40f
-                    val rDp = p.baseRadiusDp + sin(timeMs * 0.01f * p.speed + p.phase) * 10f + outward
+                    val outward = bloomEased * 14f
+                    val rDp = p.baseRadiusDp + sin(timeMs * 0.01f * p.speed + p.phase) * 7f + outward
                     val rPx = rDp.dp.toPx()
-                    val angle = p.angle + timeMs * 0.0008f * p.speed * motionMul
+                    val angle = p.angle + timeMs * 0.0005f * p.speed * motionMul
                     val px = cos(angle) * rPx
                     val py = sin(angle) * rPx
                     val col = colors[i % colors.size]
                     val edgeFalloff = (1f - max(0f, (rDp - 200f) / 100f)).coerceIn(0f, 1f)
+                    val coreLight = max(0f, 1f - rDp / 90f) * 0.4f
                     val alpha = max(
                         0f,
-                        (0.25f + sin(timeMs * 0.02f + p.phase) * 0.15f + bloomEased * 0.4f + liveAmplitude * 0.3f) * edgeFalloff
+                        (0.2f + sin(timeMs * 0.02f + p.phase) * 0.12f + bloomEased * 0.2f + coreLight) * edgeFalloff
                     )
                     drawCircle(
                         color = col.copy(alpha = alpha),
-                        radius = p.sizeDp.dp.toPx(),
+                        radius = (p.sizeDp + coreLight * 1.2f).dp.toPx(),
                         center = Offset(px, py)
                     )
                 }
+
+                sparkles.forEach { sp ->
+                    drawSpecular(sp.x, sp.y, 4f.dp.toPx(), sp.life * 0.8f)
+                }
             }
         }
-        
-        // Layer 6: Vignette
+
+        val vignetteRadius = kotlin.math.hypot(size.width, size.height) * 0.75f
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f)),
+                colorStops = arrayOf(
+                    0f to Color.Transparent,
+                    0.55f to Color.Transparent,
+                    0.8f to Color.Black.copy(alpha = 0.08f),
+                    1f to Color.Black.copy(alpha = 0.16f)
+                ),
                 center = Offset(cx, cy),
-                radius = size.width * 0.6f
+                radius = vignetteRadius
             ),
-            radius = size.width * 0.6f,
+            radius = vignetteRadius,
             center = Offset(cx, cy)
         )
+    }
+}
+
+/**
+ * Song-position -> complexity curve. Sparse on intro/outro, builds through
+ * verse/pre-chorus, peaks at chorus, dips on bridge. Approximated from
+ * `progress` alone since real per-song section timestamps
+ * (AtmosphereProfile.sectionProfiles) aren't populated by the backend yet —
+ * swap this for real section lookups once that's wired up.
+ */
+private fun sectionComplexity(progress: Float): Float {
+    val pos = progress.coerceIn(0f, 1f) * 100f
+    return when {
+        pos < 12f -> 0.35f + (pos / 12f) * 0.15f
+        pos < 35f -> 0.5f + ((pos - 12f) / 23f) * 0.15f
+        pos < 55f -> 0.65f + ((pos - 35f) / 20f) * 0.2f
+        pos < 80f -> 1.0f
+        pos < 92f -> 0.55f
+        else -> (0.4f - ((pos - 92f) / 8f) * 0.15f).coerceAtLeast(0.2f)
     }
 }
 
 private fun DrawScope.drawMandala(
     style: KaleidoscopeStyle,
     colors: List<Color>,
-    tier: TierConfig,
+    rings: Int,
     baseRot: Float,
     energy: Float,
     bloom: Float,
-    alpha: Float
+    alpha: Float,
+    sparkles: androidx.compose.runtime.snapshots.SnapshotStateList<Sparkle>
 ) {
     if (alpha <= 0f) return
-    val motif = style.toMotifKind()
+    val motifSequence = style.motifSequence()
     val symmetry = style.symmetryCount()
 
-    for (layer in 0 until tier.rings) {
-        val layerLenPx = (66f + layer * (40f + energy * 15f) + bloom * (10f + layer * 4f)).dp.toPx()
-        val layerRot = baseRot * (1f + layer * 0.15f)
-        val edgeFade = if (layer == tier.rings - 1) 0.5f else 1f
+    for (layer in 0 until rings) {
+        val motif = motifSequence[layer % motifSequence.size]
+        val layerLenPx = (60f + layer * (38f + energy * 12f) + bloom * (8f + layer * 3f)).dp.toPx()
+        val layerRot = baseRot * (1f + layer * 0.16f)
+        val edgeFade = if (layer == rings - 1) 0.55f else 1f
 
         rotate(degrees = degrees(layerRot), pivot = Offset.Zero) {
             for (s in 0 until symmetry) {
                 rotate(degrees = 360f / symmetry * s, pivot = Offset.Zero) {
                     val color = colors[layer % colors.size]
                     val highlight = colors[(layer + 1) % colors.size]
-                    val widthPx = (14f + energy * 10f - layer * 1.5f).dp.toPx()
+                    val widthPx = (14f + energy * 9f - layer * 1.2f).dp.toPx()
 
                     drawMotif(motif, color, highlight, layerLenPx, widthPx, bloom, edgeFade * alpha)
                     scale(scaleX = -1f, scaleY = 1f, pivot = Offset.Zero) {
-                        drawMotif(
-                            motif, color, highlight,
-                            layerLenPx * 0.9f, widthPx * 0.85f, bloom, edgeFade * alpha
+                        drawMotif(motif, color, highlight, layerLenPx * 0.9f, widthPx * 0.85f, bloom, edgeFade * alpha)
+                    }
+
+                    if (layer == rings - 1 && sparkles.size < 14 && Random.nextFloat() < 0.0025f) {
+                        val worldAngle = layerRot + (2 * PI.toFloat() / symmetry) * s
+                        sparkles.add(
+                            Sparkle(
+                                x = sin(-worldAngle) * layerLenPx,
+                                y = -cos(worldAngle) * layerLenPx,
+                                life = 1f
+                            )
                         )
                     }
                 }
@@ -299,17 +372,25 @@ private fun DrawScope.drawMandala(
     }
 }
 
-// ---- Motif shapes & Helpers ----
+// ---- Motif shapes & helpers ----
 
 private enum class MotifKind { Petal, Leaf, Wave, Shard, RibbonLong, Flower }
 
-private fun KaleidoscopeStyle.toMotifKind(): MotifKind = when (this) {
-    KaleidoscopeStyle.SoftOrganic -> MotifKind.Petal
-    KaleidoscopeStyle.FluidSymmetry -> MotifKind.Petal
-    KaleidoscopeStyle.WaveLike -> MotifKind.Wave
-    KaleidoscopeStyle.SharpGeometric -> MotifKind.Shard
-    KaleidoscopeStyle.DarkReflective -> MotifKind.RibbonLong
-    KaleidoscopeStyle.Floral -> MotifKind.Flower
+private class Sparkle(val x: Float, val y: Float, var life: Float)
+
+/**
+ * Each style now cycles through a short SEQUENCE of shapes by ring depth
+ * instead of repeating one shape — the "per-ring motif variety" upgrade.
+ * Outer rings get the style's primary/largest-feeling shape, inner rings
+ * pick up finer detail shapes.
+ */
+private fun KaleidoscopeStyle.motifSequence(): List<MotifKind> = when (this) {
+    KaleidoscopeStyle.SoftOrganic -> listOf(MotifKind.Petal, MotifKind.Leaf, MotifKind.Shard)
+    KaleidoscopeStyle.FluidSymmetry -> listOf(MotifKind.Petal, MotifKind.Flower, MotifKind.Shard)
+    KaleidoscopeStyle.WaveLike -> listOf(MotifKind.Wave, MotifKind.Leaf, MotifKind.Shard)
+    KaleidoscopeStyle.SharpGeometric -> listOf(MotifKind.Shard, MotifKind.Flower, MotifKind.Leaf)
+    KaleidoscopeStyle.DarkReflective -> listOf(MotifKind.RibbonLong, MotifKind.Leaf, MotifKind.Shard)
+    KaleidoscopeStyle.Floral -> listOf(MotifKind.Flower, MotifKind.Petal, MotifKind.Shard)
 }
 
 private fun KaleidoscopeStyle.symmetryCount(): Int = when (this) {
@@ -336,6 +417,22 @@ private data class KParticle(
     val sizeDp: Float,
     val phase: Float
 )
+
+private fun DrawScope.drawSpecular(x: Float, y: Float, size: Float, alpha: Float) {
+    if (alpha <= 0f) return
+    drawLine(
+        color = Color.White.copy(alpha = alpha * 0.9f),
+        start = Offset(x - size, y),
+        end = Offset(x + size, y),
+        strokeWidth = 0.8f.dp.toPx()
+    )
+    drawLine(
+        color = Color.White.copy(alpha = alpha * 0.9f),
+        start = Offset(x, y - size),
+        end = Offset(x, y + size),
+        strokeWidth = 0.8f.dp.toPx()
+    )
+}
 
 private fun DrawScope.drawMotif(
     kind: MotifKind,
@@ -397,18 +494,18 @@ private fun DrawScope.drawMotif(
             drawPath(
                 path,
                 brush = bodyBrush,
-                style = Stroke(width = w * 0.3f, cap = StrokeCap.Round),
+                style = Stroke(width = w * 0.28f, cap = StrokeCap.Round),
                 alpha = 0.7f * alpha
             )
         }
         MotifKind.RibbonLong -> {
             path.moveTo(0f, 0f)
-            path.cubicTo(w * 1.5f, -lengthPx * 0.4f, -w * 1.2f, -lengthPx * 0.7f, 0f, -lengthPx)
+            path.cubicTo(w * 1.4f, -lengthPx * 0.4f, -w * 1.2f, -lengthPx * 0.7f, 0f, -lengthPx)
             drawPath(
                 path,
                 brush = bodyBrush,
-                style = Stroke(width = w * 0.25f),
-                alpha = 0.65f * alpha
+                style = Stroke(width = w * 0.22f),
+                alpha = 0.62f * alpha
             )
         }
     }
@@ -432,8 +529,8 @@ private fun DrawScope.drawMotif(
     }
     drawPath(
         highlightPath,
-        color = highlightColor.copy(alpha = (0.3f + bloomEased * 0.4f) * alpha),
-        style = Stroke(width = 0.8f.dp.toPx())
+        color = highlightColor.copy(alpha = (0.28f + bloomEased * 0.3f) * alpha),
+        style = Stroke(width = 0.7f.dp.toPx())
     )
 }
 
@@ -446,7 +543,7 @@ private fun DrawScope.drawSecondaryGeom(color: Color, radiusPx: Float, sizePx: F
         lineTo(-sizePx * 0.7f, -radiusPx)
         close()
     }
-    drawPath(path, color = color.copy(alpha = alpha), style = Stroke(width = 0.8f.dp.toPx()))
+    drawPath(path, color = color.copy(alpha = alpha), style = Stroke(width = 0.7f.dp.toPx()))
 }
 
 private fun buildColorPalette(primaryHex: String, secondaryHexes: List<String>): List<Color> {

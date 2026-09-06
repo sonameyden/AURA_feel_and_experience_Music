@@ -1,5 +1,6 @@
 package com.aura.feature.nowplaying
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,6 +36,18 @@ class NowPlayingViewModel @Inject constructor(
 
     private val isLikedFlow = MutableStateFlow(false)
 
+    // FIX: carries the last successfully-loaded REAL profile across song
+    // changes. Without this, every skip reset atmosphereFlow to a generic
+    // neutral placeholder (Nature/Aura-Violet/Idle) for the entire network
+    // round-trip, then snapped again once the real profile arrived — two
+    // hard visual cuts sandwiching a loading gap, which is what read as both
+    // "abrupt" and "slow". By keeping the PREVIOUS real profile flowing
+    // instead, KaleidoscopeLayer's existing animateFloatAsState/
+    // animateColorAsState/style-morph logic (already built for this) smoothly
+    // carries the visuals from the old song's real profile straight to the
+    // new one, with no placeholder detour in between.
+    private var carriedAtmosphereProfile: AtmosphereProfile? = null
+
     init {
         loadAndPlay()
     }
@@ -60,6 +73,9 @@ class NowPlayingViewModel @Inject constructor(
                 val songResult = songRepository.getSong(songId)
                 val song = (songResult as? AppResult.Success)?.data
                 if (song != null) {
+                    if (song.streamUrl.isBlank()) {
+                        Log.e("NowPlayingViewModel", "Song ${song.id} has empty streamUrl!")
+                    }
                     player.play(song)
                 } else {
                     _uiState.value = NowPlayingUiState.Error("Couldn't load this song.")
@@ -77,7 +93,6 @@ class NowPlayingViewModel @Inject constructor(
         if (song.id == lastLoadedSongId) return
         lastLoadedSongId = song.id
 
-        // Reset liked status for the new song immediately
         isLikedFlow.value = false
 
         activeSongJob?.cancel()
@@ -94,7 +109,13 @@ class NowPlayingViewModel @Inject constructor(
                 libraryRepository.addToHistory(song.id)
             }
 
-            val atmosphereFlow = MutableStateFlow(AtmosphereProfile.loadingPlaceholder(song.id))
+            // FIX: seed with the carried-over previous real profile instead of
+            // AtmosphereProfile.loadingPlaceholder(song.id). Only genuinely
+            // falls back to the neutral placeholder on the very first song of
+            // the session, when there's nothing real to carry forward yet.
+            val atmosphereFlow = MutableStateFlow(
+                carriedAtmosphereProfile ?: AtmosphereProfile.loadingPlaceholder(song.id)
+            )
             val lyricsFlow = MutableStateFlow<LyricsResponse?>(null)
 
             launch {
@@ -107,20 +128,18 @@ class NowPlayingViewModel @Inject constructor(
             launch {
                 val result = atmosphereRepository.getAtmosphereForSong(song.id)
                 if (result is AppResult.Success) {
-                    println("Atmosphere Loaded for ${song.title}: ${result.data}")
                     atmosphereFlow.value = result.data
-                } else {
-                    println("Atmosphere Load FAILED for ${song.title}: ${(result as AppResult.Error).error}")
+                    // FIX: remember this as the new "last real profile" so the
+                    // *next* song change carries forward from here, not from
+                    // whatever song started the app session.
+                    carriedAtmosphereProfile = result.data
                 }
             }
-            
+
             launch {
                 val result = lyricsRepository.getLyrics(song.id)
                 if (result is AppResult.Success) {
                     lyricsFlow.value = result.data
-                } else {
-                    println("Lyrics Load FAILED for ${song.title}")
-                    lyricsFlow.value = null
                 }
             }
 
@@ -182,19 +201,15 @@ class NowPlayingViewModel @Inject constructor(
     fun onLikeClick() {
         val songId = lastLoadedSongId ?: return
         val currentLiked = isLikedFlow.value
-        
+
         viewModelScope.launch {
-            // Optimistic update
             isLikedFlow.value = !currentLiked
-            
             val result = if (currentLiked) {
                 libraryRepository.unlikeSong(songId)
             } else {
                 libraryRepository.likeSong(songId)
             }
-            
             if (result is AppResult.Error) {
-                // Rollback on failure
                 isLikedFlow.value = currentLiked
             }
         }

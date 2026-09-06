@@ -18,7 +18,7 @@ import com.aura.core.data.local.entity.SongEntity
  */
 @Database(
     entities = [SongEntity::class, PlaylistEntity::class, CatalogCacheEntity::class, ArtistEntity::class],
-    version = 2,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(RoomConverters::class)

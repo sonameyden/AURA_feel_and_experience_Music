@@ -11,7 +11,8 @@ data class ArtistEntity(
     val bio: String?,
     val imageUrl: String?,
     val isVerified: Boolean,
-    val followerCount: Int
+    val followerCount: Int,
+    val monthlyListeners: Int
 ) {
     fun toDomain() = Artist(
         id = id,
@@ -19,7 +20,8 @@ data class ArtistEntity(
         bio = bio,
         imageUrl = imageUrl,
         isVerified = isVerified,
-        followerCount = followerCount
+        followerCount = followerCount,
+        monthlyListeners = monthlyListeners
     )
 
     companion object {
@@ -29,7 +31,8 @@ data class ArtistEntity(
             bio = artist.bio,
             imageUrl = artist.imageUrl,
             isVerified = artist.isVerified,
-            followerCount = artist.followerCount
+            followerCount = artist.followerCount,
+            monthlyListeners = artist.monthlyListeners
         )
     }
 }

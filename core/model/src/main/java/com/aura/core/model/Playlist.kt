@@ -7,8 +7,8 @@ import com.squareup.moshi.JsonClass
 data class Playlist(
     @Json(name = "id") val id: String,
     @Json(name = "title") val title: String,
-    @Json(name = "owner_id") val ownerId: String,
-    @Json(name = "song_ids") val songIds: List<String>,
-    @Json(name = "is_public") val isPublic: Boolean,
-    @Json(name = "cover_color_hex") val coverColorHex: String? = null
+    @Json(name = "ownerId") val ownerId: String,
+    @Json(name = "songIds") val songIds: List<String>,
+    @Json(name = "isPublic") val isPublic: Boolean,
+    @Json(name = "coverColorHex") val coverColorHex: String? = null
 )

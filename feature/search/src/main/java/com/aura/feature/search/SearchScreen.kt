@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.aura.core.designsystem.components.AlbumArt
 import com.aura.core.designsystem.components.GlassCard
 import com.aura.core.model.Song
 import com.aura.feature.library.AddToPlaylistDialog
@@ -111,11 +112,16 @@ fun SearchScreen(
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .padding(16.dp)
+                                        .padding(12.dp)
                                         .fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    AlbumArt(
+                                        url = song.artworkUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                                         Text(
                                             text = song.title,
                                             fontWeight = FontWeight.SemiBold,

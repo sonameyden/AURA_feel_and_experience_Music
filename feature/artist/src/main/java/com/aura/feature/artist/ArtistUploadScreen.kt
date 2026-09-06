@@ -1,64 +1,42 @@
 package com.aura.feature.artist
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
+import com.aura.core.designsystem.components.AlbumArt
 import com.aura.core.designsystem.components.GlassCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import android.media.MediaMetadataRetriever
-import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,30 +47,42 @@ fun ArtistUploadScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Ensure system back button works as expected
     BackHandler(onBack = onBackClick)
     
     var title by remember { mutableStateOf("") }
     var artistName by remember { mutableStateOf("") }
     var genre by remember { mutableStateOf("") }
-    var isProcessingFile by remember { mutableStateOf(false) }
-    var selectedFile by remember { mutableStateOf<File?>(null) }
+    var isProcessingAudio by remember { mutableStateOf(false) }
+    var selectedAudioFile by remember { mutableStateOf<File?>(null) }
+    var selectedArtworkFile by remember { mutableStateOf<File?>(null) }
+    var artworkUri by remember { mutableStateOf<Uri?>(null) }
     var durationMs by remember { mutableLongStateOf(0L) }
     
     val uploadState by viewModel.uploadState.collectAsState()
 
-    val filePickerLauncher = rememberLauncherForActivityResult(
+    val audioPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
             scope.launch {
-                isProcessingFile = true
+                isProcessingAudio = true
                 try {
-                    selectedFile = getFileFromUri(context, it)
+                    selectedAudioFile = getFileFromUri(context, it, "audio")
                     durationMs = getDurationFromUri(context, it)
                 } finally {
-                    isProcessingFile = false
+                    isProcessingAudio = false
                 }
+            }
+        }
+    }
+
+    val artworkPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            artworkUri = it
+            scope.launch {
+                selectedArtworkFile = getFileFromUri(context, it, "artwork")
             }
         }
     }
@@ -120,7 +110,8 @@ fun ArtistUploadScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             if (uploadState is UploadState.Success) {
@@ -133,40 +124,93 @@ fun ArtistUploadScreen(
                     onArtistNameChange = { artistName = it },
                     genre = genre,
                     onGenreChange = { genre = it },
-                    selectedFile = selectedFile,
-                    onFileSelect = { if (!isProcessingFile) filePickerLauncher.launch("audio/*") },
-                    isProcessingFile = isProcessingFile,
+                    selectedAudioFile = selectedAudioFile,
+                    onAudioSelect = { if (!isProcessingAudio) audioPickerLauncher.launch("audio/*") },
+                    artworkUri = artworkUri,
+                    onArtworkSelect = { artworkPickerLauncher.launch("image/*") },
+                    isProcessingAudio = isProcessingAudio,
                     uploadState = uploadState,
                     onUploadClick = {
-                        selectedFile?.let { 
-                            viewModel.uploadSong(title, artistName, genre, durationMs, it) 
+                        selectedAudioFile?.let { audio ->
+                            viewModel.uploadSong(title, artistName, genre, durationMs, audio, selectedArtworkFile) 
                         }
                     }
                 )
             }
+            
+            // Extra padding for mini-player
+            Spacer(modifier = Modifier.height(130.dp))
         }
     }
 }
 
 @Composable
-private fun ColumnScope.UploadForm(
+private fun UploadForm(
     title: String,
     onTitleChange: (String) -> Unit,
     artistName: String,
     onArtistNameChange: (String) -> Unit,
     genre: String,
     onGenreChange: (String) -> Unit,
-    selectedFile: File?,
-    onFileSelect: () -> Unit,
-    isProcessingFile: Boolean,
+    selectedAudioFile: File?,
+    onAudioSelect: () -> Unit,
+    artworkUri: Uri?,
+    onArtworkSelect: () -> Unit,
+    isProcessingAudio: Boolean,
     uploadState: UploadState,
     onUploadClick: () -> Unit
 ) {
-    Text(
-        text = "Share your sound with the world.",
-        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-        fontSize = 16.sp
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Artwork Picker
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { onArtworkSelect() },
+            contentAlignment = Alignment.Center
+        ) {
+            if (artworkUri != null) {
+                AlbumArt(
+                    url = artworkUri.toString(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = "Select Artwork",
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        Column {
+            Text(
+                text = "Track Artwork",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Square images work best",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+        }
+    }
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -198,13 +242,13 @@ private fun ColumnScope.UploadForm(
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onFileSelect
+        onClick = onAudioSelect
     ) {
         Row(
             modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (isProcessingFile) {
+            if (isProcessingAudio) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
@@ -220,7 +264,7 @@ private fun ColumnScope.UploadForm(
             }
             Column(modifier = Modifier.padding(start = 16.dp)) {
                 Text(
-                    text = if (isProcessingFile) "Processing file..." else selectedFile?.name ?: "Select Audio File",
+                    text = if (isProcessingAudio) "Processing audio..." else selectedAudioFile?.name ?: "Select Audio File",
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -241,8 +285,6 @@ private fun ColumnScope.UploadForm(
         )
     }
 
-    Spacer(modifier = Modifier.weight(1f))
-
     Button(
         onClick = onUploadClick,
         modifier = Modifier
@@ -254,7 +296,7 @@ private fun ColumnScope.UploadForm(
             contentColor = Color.White
         ),
         enabled = title.isNotBlank() && artistName.isNotBlank() && 
-                 selectedFile != null && uploadState !is UploadState.Loading && !isProcessingFile
+                 selectedAudioFile != null && uploadState !is UploadState.Loading && !isProcessingAudio
     ) {
         if (uploadState is UploadState.Loading) {
             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
@@ -267,9 +309,9 @@ private fun ColumnScope.UploadForm(
 }
 
 @Composable
-private fun ColumnScope.UploadSuccessView(onBackClick: () -> Unit) {
+private fun UploadSuccessView(onBackClick: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -287,7 +329,7 @@ private fun ColumnScope.UploadSuccessView(onBackClick: () -> Unit) {
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "Your music is being processed and will be available soon.",
+            text = "Your music and artwork are being processed and will be available soon.",
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             modifier = Modifier.padding(top = 8.dp, bottom = 48.dp)
@@ -332,8 +374,9 @@ private fun UploadTextField(
     }
 }
 
-private suspend fun getFileFromUri(context: Context, uri: Uri): File = withContext(Dispatchers.IO) {
-    val tempFile = File(context.cacheDir, "upload_${System.currentTimeMillis()}.mp3")
+private suspend fun getFileFromUri(context: Context, uri: Uri, prefix: String): File = withContext(Dispatchers.IO) {
+    val extension = if (prefix == "audio") "mp3" else "jpg"
+    val tempFile = File(context.cacheDir, "${prefix}_${System.currentTimeMillis()}.$extension")
     context.contentResolver.openInputStream(uri)?.use { input ->
         tempFile.outputStream().use { output ->
             input.copyTo(output)

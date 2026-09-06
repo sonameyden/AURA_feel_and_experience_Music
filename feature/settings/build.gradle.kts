@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:auth"))
     implementation(project(":core:audio"))
+    implementation(project(":feature:artist"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

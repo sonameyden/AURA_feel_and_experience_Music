@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.toColorInt
 import app.rive.runtime.kotlin.RiveAnimationView
 import com.aura.core.model.AtmosphereProfile
 
@@ -44,7 +45,7 @@ fun EnvironmentBackground(
 
     if (!assetExists) {
         val placeholderColor = runCatching {
-            Color(android.graphics.Color.parseColor(profile.primaryColorHex))
+            Color(profile.primaryColorHex.toColorInt())
         }.getOrDefault(Color.DarkGray)
 
         Box(modifier = modifier.fillMaxSize().background(placeholderColor))

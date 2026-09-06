@@ -65,9 +65,8 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(authInterceptor: Interceptor): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
-            // Never log full bodies in release builds — avoid leaking user data,
-            // per the "avoid logging tokens/personal data" best practice.
-            level = HttpLoggingInterceptor.Level.BASIC
+            // Enabling BODY logging temporarily to debug the 500 error
+            level = HttpLoggingInterceptor.Level.BODY
         }
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)

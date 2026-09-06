@@ -1,6 +1,7 @@
 package com.aura.app.navigation
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -62,6 +62,10 @@ fun AuraNavHost(
     val showBottomBar = currentRoute in mainRoutes
     val isLight = MaterialTheme.colorScheme.surface.luminance() > 0.5f
 
+    val authViewModel: NavAuthViewModel = hiltViewModel()
+    val authState by authViewModel.authState.collectAsState()
+    val currentUserId = (authState as? AuthState.Authenticated)?.userId
+
     val miniPlayerViewModel: MiniPlayerViewModel = hiltViewModel()
     val playbackState by miniPlayerViewModel.playbackState.collectAsState()
 
@@ -81,6 +85,13 @@ fun AuraNavHost(
 
     val showMiniPlayer = song != null && currentRoute !in hideMiniPlayerRoutes
 
+    fun navigateToNowPlaying(songId: String) {
+        navController.navigate(Destination.NowPlaying.createRoute(songId)) {
+            popUpTo(Destination.NowPlaying.route) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
     Scaffold(
         bottomBar = {
             Column(
@@ -95,14 +106,10 @@ fun AuraNavHost(
                         artworkUrl = song.artworkUrl,
                         isPlaying = playbackState is PlaybackState.Playing || playbackState is PlaybackState.Buffering,
                         onPlayPauseClick = miniPlayerViewModel::onPlayPauseClick,
-                        onBarClick = { 
-                            navController.navigate(Destination.NowPlaying.createRoute(song.id)) {
-                                launchSingleTop = true
-                            }
-                        },
+                        onBarClick = { navigateToNowPlaying(song.id) },
                         modifier = Modifier
                             .padding(horizontal = 12.dp)
-                            .padding(bottom = 0.dp) // Anchored tight
+                            .padding(bottom = 0.dp)
                     )
                 }
 
@@ -110,7 +117,7 @@ fun AuraNavHost(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 0.dp) // Anchored to bottom padding
+                            .padding(start = 16.dp, end = 16.dp, bottom = 0.dp)
                     ) {
                         Surface(
                             modifier = Modifier
@@ -197,114 +204,136 @@ fun AuraNavHost(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            NavHost(
-                navController = navController,
-                startDestination = Destination.AuthGate.route
-            ) {
-                composable(Destination.AuthGate.route) {
-                    val authViewModel: NavAuthViewModel = hiltViewModel()
-                    val authState by authViewModel.authState.collectAsState()
-
-                    LaunchedEffect(authState) {
-                        when (authState) {
-                            is AuthState.Authenticated -> navController.navigate(Destination.Home.route) {
-                                popUpTo(Destination.AuthGate.route) { inclusive = true }
+            // PERSISTENT BACKGROUND: Ensures non-immersive screens share a static atmosphere
+            AuraBackground {
+                NavHost(
+                    navController = navController,
+                    startDestination = Destination.AuthGate.route,
+                    enterTransition = { fadeIn(animationSpec = tween(400)) },
+                    exitTransition = { fadeOut(animationSpec = tween(400)) },
+                    popEnterTransition = { fadeIn(animationSpec = tween(400)) },
+                    popExitTransition = { fadeOut(animationSpec = tween(400)) }
+                ) {
+                    composable(Destination.AuthGate.route) {
+                        LaunchedEffect(authState) {
+                            when (authState) {
+                                is AuthState.Authenticated -> navController.navigate(Destination.Home.route) {
+                                    popUpTo(Destination.AuthGate.route) { inclusive = true }
+                                }
+                                AuthState.Unauthenticated -> navController.navigate(Destination.Login.route) {
+                                    popUpTo(Destination.AuthGate.route) { inclusive = true }
+                                }
+                                AuthState.Loading -> Unit
                             }
-                            AuthState.Unauthenticated -> navController.navigate(Destination.Login.route) {
-                                popUpTo(Destination.AuthGate.route) { inclusive = true }
-                            }
-                            AuthState.Loading -> Unit
+                        }
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                         }
                     }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    }
-                }
-
-                composable(Destination.Login.route) {
-                    LoginScreen(
-                        onLoginSuccess = {
-                            navController.navigate(Destination.Home.route) {
-                                popUpTo(Destination.Login.route) { inclusive = true }
-                            }
-                        },
-                        onNavigateToSignUp = { navController.navigate(Destination.SignUp.route) }
-                    )
-                }
-
-                composable(Destination.SignUp.route) {
-                    SignUpScreen(
-                        onSignUpSuccess = {
-                            navController.navigate(Destination.Home.route) {
-                                popUpTo(Destination.SignUp.route) { inclusive = true }
-                            }
-                        },
-                        onNavigateToLogin = { navController.popBackStack() }
-                    )
-                }
-
-                composable(Destination.Home.route) {
-                    HomeScreen(
-                        onSongClick = { songId ->
-                            navController.navigate(Destination.NowPlaying.createRoute(songId)) {
-                                launchSingleTop = true
-                            }
-                        },
-                        onArtistClick = { artistId ->
-                            navController.navigate(Destination.ArtistProfile.createRoute(artistId))
-                        },
-                        onMoodClick = { navController.navigate(Destination.MoodInput.route) },
-                        onProfileClick = { navController.navigate(Destination.Settings.route) }
-                    )
-                }
-
-                composable(Destination.Search.route) {
-                    AuraBackground {
-                        SearchScreen(
-                            onSongClick = { songId ->
-                                navController.navigate(Destination.NowPlaying.createRoute(songId)) {
-                                    launchSingleTop = true
+                    composable(Destination.Login.route) {
+                        LoginScreen(
+                            onLoginSuccess = {
+                                navController.navigate(Destination.Home.route) {
+                                    popUpTo(Destination.Login.route) { inclusive = true }
                                 }
                             },
+                            onNavigateToSignUp = { navController.navigate(Destination.SignUp.route) }
+                        )
+                    }
+
+                    composable(Destination.SignUp.route) {
+                        SignUpScreen(
+                            onSignUpSuccess = {
+                                navController.navigate(Destination.Home.route) {
+                                    popUpTo(Destination.SignUp.route) { inclusive = true }
+                                }
+                            },
+                            onNavigateToLogin = { navController.popBackStack() }
+                        )
+                    }
+
+                    composable(
+                        route = Destination.Home.route,
+                        exitTransition = { fadeOut(animationSpec = tween(300)) },
+                        popEnterTransition = { fadeIn(animationSpec = tween(300)) }
+                    ) {
+                        HomeScreen(
+                            onSongClick = { songId -> navigateToNowPlaying(songId) },
+                            onArtistClick = { artistId ->
+                                navController.navigate(Destination.ArtistProfile.createRoute(artistId))
+                            },
+                            onMoodClick = { navController.navigate(Destination.MoodInput.route) },
+                            onProfileClick = { navController.navigate(Destination.Settings.route) }
+                        )
+                    }
+
+                    composable(Destination.Search.route) {
+                        SearchScreen(
+                            onSongClick = { songId -> navigateToNowPlaying(songId) },
                             onArtistClick = { artistId ->
                                 navController.navigate(Destination.ArtistProfile.createRoute(artistId))
                             },
                             onBackClick = { navController.popBackStack() }
                         )
                     }
-                }
 
-                composable(Destination.MoodInput.route) {
-                    MoodInputScreen(
-                        onSongSelected = { songId ->
-                            navController.navigate(Destination.NowPlaying.createRoute(songId)) {
-                                launchSingleTop = true
-                                popUpTo(Destination.MoodInput.route) { inclusive = true }
-                            }
+                    composable(
+                        route = Destination.MoodInput.route,
+                        enterTransition = {
+                            fadeIn(animationSpec = tween(500)) + slideInVertically(
+                                initialOffsetY = { it / 4 },
+                                animationSpec = tween(500)
+                            )
                         },
-                        onBackClick = { navController.popBackStack() }
-                    )
-                }
-
-                composable(
-                    route = Destination.NowPlaying.route,
-                    arguments = listOf(navArgument(Destination.NowPlaying.ARG_SONG_ID) {
-                        type = NavType.StringType
-                    })
-                ) { backStackEntry ->
-                    val songId = backStackEntry.arguments?.getString(Destination.NowPlaying.ARG_SONG_ID).orEmpty()
-                    NowPlayingScreen(
-                        songId = songId,
-                        onBackClick = { navController.popBackStack() },
-                        onArtistClick = { artistId ->
-                            navController.navigate(Destination.ArtistProfile.createRoute(artistId))
+                        exitTransition = { fadeOut(animationSpec = tween(400)) },
+                        popExitTransition = {
+                            fadeOut(animationSpec = tween(400)) + slideOutVertically(
+                                targetOffsetY = { it / 4 },
+                                animationSpec = tween(400)
+                            )
                         }
-                    )
-                }
+                    ) {
+                        MoodInputScreen(
+                            onSongSelected = { songId ->
+                                navController.navigate(Destination.NowPlaying.createRoute(songId)) {
+                                    launchSingleTop = true
+                                    popUpTo(Destination.Home.route)
+                                }
+                            },
+                            onBackClick = { navController.popBackStack() }
+                        )
+                    }
 
-                composable(Destination.Library.route) {
-                    AuraBackground {
+                    composable(
+                        route = Destination.NowPlaying.route,
+                        arguments = listOf(navArgument(Destination.NowPlaying.ARG_SONG_ID) {
+                            type = NavType.StringType
+                        }),
+                        enterTransition = {
+                            fadeIn(animationSpec = tween(600)) + slideInVertically(
+                                initialOffsetY = { it },
+                                animationSpec = tween(600)
+                            )
+                        },
+                        popExitTransition = {
+                            fadeOut(animationSpec = tween(500)) + slideOutVertically(
+                                targetOffsetY = { it },
+                                animationSpec = tween(500)
+                            )
+                        }
+                    ) { backStackEntry ->
+                        val songId = backStackEntry.arguments?.getString(Destination.NowPlaying.ARG_SONG_ID).orEmpty()
+                        NowPlayingScreen(
+                            songId = songId,
+                            onBackClick = { navController.popBackStack() },
+                            onArtistClick = { artistId ->
+                                navController.navigate(Destination.ArtistProfile.createRoute(artistId))
+                            }
+                        )
+                    }
+
+                    composable(Destination.Library.route) {
                         LibraryScreen(
                             onPlaylistClick = { playlistId ->
                                 navController.navigate(Destination.PlaylistDetail.createRoute(playlistId))
@@ -315,43 +344,25 @@ fun AuraNavHost(
                             onLikedSongsClick = { navController.navigate(Destination.LikedSongs.route) },
                             onHistoryClick = { navController.navigate(Destination.History.route) },
                             onPlaylistsClick = { navController.navigate(Destination.Playlists.route) },
-                            onSongClick = { songId ->
-                                navController.navigate(Destination.NowPlaying.createRoute(songId)) {
-                                    launchSingleTop = true
-                                }
-                            }
+                            onSongClick = { songId -> navigateToNowPlaying(songId) }
                         )
                     }
-                }
 
-                composable(Destination.LikedSongs.route) {
-                    AuraBackground {
+                    composable(Destination.LikedSongs.route) {
                         LikedSongsScreen(
                             onBackClick = { navController.popBackStack() },
-                            onSongClick = { songId ->
-                                navController.navigate(Destination.NowPlaying.createRoute(songId)) {
-                                    launchSingleTop = true
-                                }
-                            }
+                            onSongClick = { songId -> navigateToNowPlaying(songId) }
                         )
                     }
-                }
 
-                composable(Destination.History.route) {
-                    AuraBackground {
+                    composable(Destination.History.route) {
                         HistoryScreen(
                             onBackClick = { navController.popBackStack() },
-                            onSongClick = { songId ->
-                                navController.navigate(Destination.NowPlaying.createRoute(songId)) {
-                                    launchSingleTop = true
-                                }
-                            }
+                            onSongClick = { songId -> navigateToNowPlaying(songId) }
                         )
                     }
-                }
 
-                composable(Destination.Playlists.route) {
-                    AuraBackground {
+                    composable(Destination.Playlists.route) {
                         PlaylistsScreen(
                             onBackClick = { navController.popBackStack() },
                             onPlaylistClick = { playlistId ->
@@ -359,54 +370,44 @@ fun AuraNavHost(
                             }
                         )
                     }
-                }
 
-                composable(
-                    route = Destination.PlaylistDetail.route,
-                    arguments = listOf(navArgument(Destination.PlaylistDetail.ARG_PLAYLIST_ID) {
-                        type = NavType.StringType
-                    })
-                ) { backStackEntry ->
-                    val playlistId = backStackEntry.arguments?.getString(Destination.PlaylistDetail.ARG_PLAYLIST_ID).orEmpty()
-                    AuraBackground {
+                    composable(
+                        route = Destination.PlaylistDetail.route,
+                        arguments = listOf(navArgument(Destination.PlaylistDetail.ARG_PLAYLIST_ID) {
+                            type = NavType.StringType
+                        })
+                    ) { backStackEntry ->
+                        val playlistId = backStackEntry.arguments?.getString(Destination.PlaylistDetail.ARG_PLAYLIST_ID).orEmpty()
                         PlaylistDetailScreen(
                             playlistId = playlistId,
                             onBackClick = { navController.popBackStack() },
-                            onSongClick = { songId ->
-                                navController.navigate(Destination.NowPlaying.createRoute(songId)) {
-                                    launchSingleTop = true
-                                }
-                            }
+                            onSongClick = { songId -> navigateToNowPlaying(songId) }
                         )
                     }
-                }
 
-                composable(
-                    route = Destination.ArtistProfile.route,
-                    arguments = listOf(navArgument(Destination.ArtistProfile.ARG_ARTIST_ID) {
-                        type = NavType.StringType
-                    })
-                ) { backStackEntry ->
-                    val artistId = backStackEntry.arguments?.getString(Destination.ArtistProfile.ARG_ARTIST_ID).orEmpty()
-                    AuraBackground {
+                    composable(
+                        route = Destination.ArtistProfile.route,
+                        arguments = listOf(navArgument(Destination.ArtistProfile.ARG_ARTIST_ID) {
+                            type = NavType.StringType
+                        })
+                    ) { backStackEntry ->
+                        val artistId = backStackEntry.arguments?.getString(Destination.ArtistProfile.ARG_ARTIST_ID).orEmpty()
                         ArtistProfileScreen(
                             artistId = artistId,
                             onBackClick = { navController.popBackStack() },
-                            onUploadClick = { navController.navigate(Destination.ArtistUpload.route) }
+                            onUploadClick = { navController.navigate(Destination.ArtistUpload.route) },
+                            onSongClick = { songId -> navigateToNowPlaying(songId) },
+                            currentUserId = currentUserId
                         )
                     }
-                }
 
-                composable(Destination.ArtistUpload.route) {
-                    AuraBackground {
+                    composable(Destination.ArtistUpload.route) {
                         ArtistUploadScreen(
                             onBackClick = { navController.popBackStack() }
                         )
                     }
-                }
 
-                composable(Destination.Settings.route) {
-                    AuraBackground {
+                    composable(Destination.Settings.route) {
                         SettingsScreen(
                             onBackClick = { navController.popBackStack() },
                             onLoggedOut = {

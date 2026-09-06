@@ -79,6 +79,13 @@ class AuraPlayer @Inject constructor(
                         when (playbackState) {
                             Player.STATE_BUFFERING -> _playbackState.value = PlaybackState.Buffering(song)
                             Player.STATE_READY -> {
+                                // FIX: the real audio session id is only guaranteed to exist
+                                // once we hit READY. Re-emit it every time so AudioAnalyzer
+                                // in NowPlayingViewModel actually gets a valid, non-zero id.
+                                val sessionId = this@apply.audioSessionId
+                                if (sessionId != 0 && sessionId != _audioSessionId.value) {
+                                    _audioSessionId.value = sessionId
+                                }
                                 emitPlayingOrPaused(song)
                                 startPositionTicker()
                             }

@@ -7,8 +7,8 @@ import com.squareup.moshi.JsonClass
 data class Album(
     @Json(name = "id") val id: String,
     @Json(name = "title") val title: String,
-    @Json(name = "artist_id") val artistId: String,
-    @Json(name = "artwork_url") val artworkUrl: String?,
-    @Json(name = "song_ids") val songIds: List<String>,
-    @Json(name = "release_date") val releaseDate: String?
+    @Json(name = "artistId") val artistId: String,
+    @Json(name = "artworkUrl") val artworkUrl: String? = null,
+    @Json(name = "songIds") val songIds: List<String> = emptyList(),
+    @Json(name = "releaseDate") val releaseDate: String? = null
 )
