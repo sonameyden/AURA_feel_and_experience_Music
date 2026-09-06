@@ -55,6 +55,7 @@ fun NowPlayingScreen(
                 EnvironmentBackground(
                     profile = profile,
                     liveAudioEnergy = state.liveAudioEnergy,
+                    beatPulse = state.beatPulse,
                     modifier = Modifier.fillMaxSize()
                 )
 
