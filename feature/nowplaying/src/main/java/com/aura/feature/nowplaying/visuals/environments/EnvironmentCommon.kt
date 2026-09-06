@@ -3,6 +3,8 @@ package com.aura.feature.nowplaying.visuals.environments
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,6 +15,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -22,6 +25,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.toColorInt
 import com.aura.core.model.AtmosphereProfile
@@ -38,6 +43,7 @@ internal fun EnvironmentCanvas(
     beatPulse: Boolean,
     modifier: Modifier = Modifier,
     label: String,
+    backgroundId: Int? = null,
     content: DrawScope.(colors: List<Color>, energy: Float, brightness: Float, timeMs: Float) -> Unit
 ) {
     val colors = remember(profile.primaryColorHex, profile.secondaryColorHexes) {
@@ -77,9 +83,22 @@ internal fun EnvironmentCanvas(
     }
     val brightness = baseBrightness * (1f + bloom * 0.15f)
 
-    Canvas(modifier = modifier.fillMaxSize()) {
-        val energy = (animatedIntensity * 0.6f + currentLiveEnergy * 0.4f).coerceIn(0f, 1f)
-        content(colors, energy, brightness, timeMs)
+    Box(modifier = modifier.fillMaxSize()) {
+        if (backgroundId != null) {
+            Image(
+                painter = painterResource(id = backgroundId),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(brightness.coerceIn(0.6f, 1.2f))
+            )
+        }
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val energy = (animatedIntensity * 0.6f + currentLiveEnergy * 0.4f).coerceIn(0f, 1f)
+            content(colors, energy, brightness, timeMs)
+        }
     }
 }
 
@@ -102,163 +121,91 @@ fun lerpColor(a: Color, b: Color, t: Float): Color = Color(
 )
 
 /**
- * Advanced Painterly Helpers
+ * Procedural Helpers for Atmospheric Effects
  */
 
 /**
- * Draws soft, organic rolling hills using Bezier curves (match Nature/Hopeful boards).
+ * Draws floating motes/pollen (match Heaven, Hopeful, Melancholic).
  */
-fun DrawScope.drawRollingHills(
-    yBase: Float,
-    amplitude: Float,
-    color: Color,
-    brightness: Float,
-    timeOffset: Float = 0f
-) {
-    val path = Path().apply {
-        moveTo(0f, size.height)
-        lineTo(0f, yBase)
-        
-        val segments = 3
-        val segmentWidth = size.width / segments
-        for (i in 0 until segments) {
-            val startX = i * segmentWidth
-            val endX = (i + 1) * segmentWidth
-            val midX = startX + segmentWidth / 2f
-            
-            // Subtle wave motion if needed
-            val hStart = (sin((startX / size.width) * 2 * PI + timeOffset) * amplitude).toFloat()
-            val hEnd = (sin((endX / size.width) * 2 * PI + timeOffset) * amplitude).toFloat()
-            
-            cubicTo(
-                midX - segmentWidth * 0.3f, yBase + hStart - amplitude * 0.8f,
-                midX + segmentWidth * 0.3f, yBase + hEnd - amplitude * 0.8f,
-                endX, yBase + hEnd
-            )
-        }
-        
-        lineTo(size.width, size.height)
-        close()
+fun DrawScope.drawFloatingMotes(count: Int, energy: Float, timeMs: Float, color: Color, brightness: Float) {
+    for (i in 0 until count) {
+        val phase = timeMs / (2000f + i * 300f)
+        val x = size.width * ((i * 13) % 100 / 100f + sin(phase) * 0.05f)
+        val y = size.height * ((i * 17) % 100 / 100f + cos(phase * 0.8f) * 0.1f)
+        val alpha = (0.15f + energy * 0.3f) * ((sin(phase * 1.2f) + 1f) / 2f)
+        drawCircle(
+            color = color.copy(alpha = alpha * brightness),
+            radius = 1.2.dp.toPx(),
+            center = Offset(x, y)
+        )
     }
-    drawPath(path, color = color.copy(alpha = color.alpha * brightness))
 }
 
 /**
- * Draws a fluffy, volumetric cloud with inner shading.
+ * Draws falling elements (leaves, petals).
  */
-fun DrawScope.drawVolumetricCloud(center: Offset, scale: Float, color: Color, brightness: Float) {
-    val r = 30f * scale
-    val cloudColor = color.copy(alpha = color.alpha * brightness)
-    val shadowColor = Color.Black.copy(alpha = 0.05f * brightness)
-
-    // Base circles
-    listOf(
-        Offset(-r * 1.2f, r * 0.2f) to 0.8f,
-        Offset(-r * 0.6f, -r * 0.4f) to 1.1f,
-        Offset(r * 0.2f, -r * 0.6f) to 1.3f,
-        Offset(r * 1.0f, -r * 0.2f) to 1.0f,
-        Offset(r * 0.4f, r * 0.3f) to 0.9f
-    ).forEach { (off, s) ->
-        drawCircle(
-            brush = Brush.radialGradient(
-                0.0f to cloudColor,
-                0.8f to cloudColor,
-                1.0f to Color.Transparent,
-                center = center + off,
-                radius = r * s
-            ),
-            radius = r * s,
-            center = center + off
-        )
-        // Add subtle bottom shadow for volume
-        drawCircle(
-            color = shadowColor,
-            radius = r * s * 0.8f,
-            center = center + off + Offset(0f, r * 0.2f)
-        )
+fun DrawScope.drawFallingElements(
+    count: Int,
+    energy: Float,
+    timeMs: Float,
+    color: Color,
+    brightness: Float,
+    isLeaf: Boolean = false
+) {
+    for (i in 0 until count) {
+        val speed = 6000f - energy * 2500f
+        val phase = timeMs / speed + i * 0.2f
+        val loop = phase % 1.2f - 0.1f
+        val x = size.width * (((i * 23) % 100) / 100f + sin(phase * 5f) * 0.06f)
+        val y = size.height * loop
+        val alpha = (0.8f - loop.coerceIn(0f, 1f) * 0.4f) * brightness
+        
+        rotate(degrees = phase * 180f, pivot = Offset(x, y)) {
+            if (isLeaf) {
+                // Leaf shape (pointed oval)
+                val path = Path().apply {
+                    moveTo(x, y - 6.dp.toPx())
+                    quadraticTo(x + 4.dp.toPx(), y, x, y + 6.dp.toPx())
+                    quadraticTo(x - 4.dp.toPx(), y, x, y - 6.dp.toPx())
+                }
+                drawPath(path, color = color.copy(alpha = alpha.coerceIn(0f, 1f)))
+            } else {
+                // Petal shape (softer oval)
+                drawOval(
+                    color = color.copy(alpha = alpha.coerceIn(0f, 1f)),
+                    topLeft = Offset(x - 5.dp.toPx(), y - 3.dp.toPx()),
+                    size = Size(10.dp.toPx(), 6.dp.toPx())
+                )
+            }
+        }
     }
 }
 
 /**
  * Draws the consistent pale stone shelf for the cat.
- * Matches Layer 5 (Ground) in images.
+ * Now aligned closer to the center/bottom as per user request.
  */
 fun DrawScope.drawRestingLedge() {
-    val widthFrac = 0.55f
-    val yFrac = 0.76f // Adjusted to sit better with cat's 180dp bottom padding
+    val widthFrac = 0.52f
+    val yFrac = 0.82f 
     val w = size.width * widthFrac
-    val h = w * 0.32f
+    val h = w * 0.28f
     val topLeft = Offset(size.width * (0.5f - widthFrac / 2f), size.height * yFrac)
     
-    // Base stone shape
     drawOval(
-        brush = Brush.verticalGradient(
-            listOf(Color(0xFFE9E4DE), Color(0xFFD8D2C9))
-        ),
+        brush = Brush.verticalGradient(listOf(Color(0xFFF3F0EC), Color(0xFFD8D2C9))),
         topLeft = topLeft,
         size = Size(w, h)
     )
     
-    // "Root/Detail" lines from Layer 5
+    val detailColor = Color.Black.copy(alpha = 0.12f)
     val path = Path().apply {
-        moveTo(topLeft.x + w * 0.1f, topLeft.y + h * 0.5f)
-        quadraticTo(topLeft.x + w * 0.3f, topLeft.y + h * 0.8f, topLeft.x + w * 0.2f, topLeft.y + h)
-        moveTo(topLeft.x + w * 0.8f, topLeft.y + h * 0.4f)
-        quadraticTo(topLeft.x + w * 0.7f, topLeft.y + h * 0.7f, topLeft.x + w * 0.9f, topLeft.y + h)
+        moveTo(topLeft.x + w * 0.15f, topLeft.y + h * 0.4f)
+        quadraticTo(topLeft.x + w * 0.3f, topLeft.y + h * 0.7f, topLeft.x + w * 0.25f, topLeft.y + h * 0.9f)
+        moveTo(topLeft.x + w * 0.8f, topLeft.y + h * 0.35f)
+        quadraticTo(topLeft.x + w * 0.7f, topLeft.y + h * 0.6f, topLeft.x + w * 0.75f, topLeft.y + h * 0.85f)
     }
-    drawPath(path, color = Color.Black.copy(alpha = 0.15f), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
-}
-
-/**
- * Draws overhanging forest branches for framing (match Melancholic/Nature).
- */
-fun DrawScope.drawForestFraming(color: Color, brightness: Float) {
-    val framingColor = color.copy(alpha = 0.9f * brightness)
-    val path = Path().apply {
-        // Top right branch
-        moveTo(size.width, 0f)
-        lineTo(size.width * 0.7f, 0f)
-        cubicTo(size.width * 0.8f, size.height * 0.1f, size.width * 0.9f, size.height * 0.2f, size.width, size.height * 0.15f)
-        close()
-    }
-    drawPath(path, color = framingColor)
-    
-    // Draw some leaf clusters
-    listOf(Offset(size.width * 0.75f, size.height * 0.08f), Offset(size.width * 0.85f, size.height * 0.15f)).forEach { pos ->
-        drawOval(color = framingColor, topLeft = pos, size = Size(40.dp.toPx(), 24.dp.toPx()))
-    }
-}
-
-fun DrawScope.drawTree(base: Offset, scale: Float, color: Color) {
-    drawLine(
-        color = Color(0xFF423D33), // Darker trunk
-        start = base,
-        end = Offset(base.x, base.y - 45f * scale),
-        strokeWidth = 6f * scale,
-        cap = StrokeCap.Round
-    )
-    // Detailed canopy
-    drawDetailedCanopy(Offset(base.x, base.y - 60f * scale), scale, color)
-}
-
-private fun DrawScope.drawDetailedCanopy(center: Offset, scale: Float, color: Color) {
-    val r = 25f * scale
-    listOf(Offset(0f, 0f), Offset(-r*0.6f, r*0.3f), Offset(r*0.6f, r*0.3f), Offset(0f, -r*0.5f)).forEach { off ->
-        drawCircle(color = color.copy(alpha = 0.95f), radius = r, center = center + off)
-    }
-}
-
-fun DrawScope.drawFlower(center: Offset, r: Float, petalColor: Color, coreColor: Color) {
-    for (p in 0 until 5) {
-        rotate(degrees = 72f * p, pivot = center) {
-            drawOval(
-                color = petalColor.copy(alpha = 0.85f),
-                topLeft = Offset(center.x - r * 0.4f, center.y - r),
-                size = Size(r * 0.8f, r * 1.1f)
-            )
-        }
-    }
-    drawCircle(color = coreColor, radius = r * 0.35f, center = center)
+    drawPath(path, color = detailColor, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
 }
 
 fun DrawScope.drawLightRays(
